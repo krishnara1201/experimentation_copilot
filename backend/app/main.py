@@ -2,10 +2,10 @@ from fastapi import FastAPI, APIRouter
 from app.api.routes import health, experiments, auth
 # from api.routes import metrics, uploads, analytics
 from typing import Annotated
+from app.db.session import get_session, lifespan
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
-# @app.on_event("startup")
 # async def startup_event():
 
 # Include the routers
