@@ -1,6 +1,7 @@
 from typing import List, Optional
 from datetime import date, datetime, timezone   
 from sqlmodel import SQLModel, Field, Relationship
+from enum import Enum
 
 class Experiment_status(str, Enum):
     DRAFT = "draft"

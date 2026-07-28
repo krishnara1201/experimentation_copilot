@@ -1,0 +1,38 @@
+from fastapi import Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel import select
+from app.db.session import get_session
+from app.db.models.user_model import UserReceived
+from jose import jwt as jose_jwt
+import os
+from jose.exceptions import JWTError
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
+
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl="api/auth/token")
+
+async def get_current_user(token: str = Depends(oauth2_bearer), db: AsyncSession = Depends(get_session)) -> UserReceived:
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jose_jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    result = await db.execute(
+        select(User).where(User.email == username)
+    )
+    user = result.scalars().first()
+    if user is None:
+        raise credentials_exception
+    return user

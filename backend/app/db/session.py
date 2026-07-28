@@ -12,6 +12,7 @@ engine = create_async_engine(DATABASE_URL)
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSession(engine) as session:
-        yield session
-
-
+        try:
+            yield session
+        finally:
+            await session.close()
