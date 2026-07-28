@@ -40,7 +40,7 @@ async def create_user(username: str, password: str, email: EmailStr, session: As
     
 
     async with session:
-        await session.add(user)
+        session.add(user)
         try:
             await session.commit()
             await session.refresh(user)

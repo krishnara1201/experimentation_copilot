@@ -1,8 +1,8 @@
 """initial migration
 
-Revision ID: 8537a33d6e55
+Revision ID: 2cecfc48c257
 Revises: 
-Create Date: 2026-07-27 22:50:45.225519
+Create Date: 2026-07-28 13:52:29.051625
 
 """
 from typing import Sequence, Union
@@ -14,7 +14,7 @@ import sqlmodel
 
 
 # revision identifiers, used by Alembic.
-revision: str = '8537a33d6e55'
+revision: str = '2cecfc48c257'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -39,14 +39,14 @@ def upgrade() -> None:
     op.create_table('experiment',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('owner', sa.Integer(), nullable=False),
+    sa.Column('owner_id', sa.Integer(), nullable=False),
     sa.Column('status', sa.Enum('DRAFT', 'RUNNING', 'COMPLETED', 'PAUSED', 'CANCELLED', name='experiment_status'), nullable=False),
     sa.Column('hypothesis', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('unit_of_randomization', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('start_date', sa.Date(), nullable=False),
     sa.Column('end_date', sa.Date(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['owner'], ['user.id'], ),
+    sa.ForeignKeyConstraint(['owner_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('experiment', schema=None) as batch_op:
