@@ -12,12 +12,12 @@ router = APIRouter(prefix="/api/experiments", tags=["experiments"])
 async def create_experiment(name: str, description: str, 
                             session: AsyncSession = Depends(get_session),
                             owner: UserReceived = Depends(get_current_user)):
-    experiment = Experiment(name=experiment.name, 
-                            description=experiment.description, 
+    experiment = Experiment(name=name, 
+                            description=description, 
                             owner_id=owner.id)
     
-    with session:
-        await session.add(experiment)
+    async with session:
+        session.add(experiment)
         await session.commit()
         await session.refresh(experiment)
     return {"message": "Experiment created"}
@@ -25,7 +25,7 @@ async def create_experiment(name: str, description: str,
 @router.get("/")
 async def get_experiments(session: AsyncSession = Depends(get_session),
                           owner: UserReceived = Depends(get_current_user)):
-    async with Session() as session:
+    async with session:
         result = await session.execute(select(Experiment).where(Experiment.owner_id == owner.id))
         experiments = result.scalars().all()
     yield {"experiments": experiments}
