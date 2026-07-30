@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.db.models.user_model import UserReceived, User
+from app.db.models.user_model import UserReceived, User, UserRegister
 from app.db.session import get_session
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
@@ -19,11 +19,6 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 class Token(BaseModel):
     access_token: str
     token_type: str
-
-class UserRegister(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
 
 @router.post("/register")
 async def create_user(

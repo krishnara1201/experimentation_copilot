@@ -3,6 +3,7 @@ from datetime import date, datetime, timezone
 from app.db.models.experiment_model import Experiment
 from sqlmodel import SQLModel, Field, Relationship
 from app.db.session import get_session
+from pydantic import EmailStr
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -19,3 +20,8 @@ class UserReceived(SQLModel):
     email: str
     is_active: bool
     created_at: datetime
+
+class UserRegister(SQLModel):
+    username: str
+    email: EmailStr
+    password: str
