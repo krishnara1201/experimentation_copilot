@@ -3,8 +3,8 @@ from app.db.models.experiment_model import Experiment
 from app.db.models.metric_model import Metric, Metric_type, Metric_direction
 from app.db.models.variant_model import Variant
 from app.db.session import get_session
-# from app.stats.sample_size_calculator import calculate_sample_size
-from sqlmodel import Session, select
+from app.stats.calculators import calculate_sample_size, calculate_minimum_detectable_effect
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.db.models.user_model import UserReceived
 from app.api.auth.dependency import get_current_user
@@ -287,26 +287,52 @@ async def delete_variant(experiment_id: int, variant_id: int, session: AsyncSess
         await session.commit()
     return {"message": f"Variant {variant_id} deleted"}
 
-# @router.post("/{experiment_id}/sample-size")
-# async def calculate_sample_size_endpoint(experiment_id: int, metric_id: int,
-#                                          alpha: float = 0.05, 
-#                                          power: float = 0.8, 
-#                                          effect_size: float = 0.1,
-#                                          session: AsyncSession = Depends(get_session),
-#                                          owner: UserReceived = Depends(get_current_user)):
+@router.post("/{experiment_id}/sample-size")
+async def calculate_sample_size_endpoint(experiment_id: int, metric_id: int,
+                                         alpha: float = 0.05, 
+                                         power: float = 0.8, 
+                                         effect_size: float = 0.1,
+                                         base_rate: float = 0.5,
+                                         session: AsyncSession = Depends(get_session),
+                                         owner: UserReceived = Depends(get_current_user)):
     
-#     async with session:
-#         owner_experiment_result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == owner.id))
-#         owner_experiment = owner_experiment_result.scalars().first()
-#         if not owner_experiment:
-#             raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update its metrics.")
+    async with session:
+        owner_experiment_result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == owner.id))
+        owner_experiment = owner_experiment_result.scalars().first()
+        if not owner_experiment:
+            raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update its metrics.")
         
-#         result = await session.execute(select(Metric).where(Metric.id == metric_id, Metric.experiment_id == experiment_id))
-#         metric = result.scalars().first()
+        result = await session.execute(select(Metric).where(Metric.id == metric_id, Metric.experiment_id == experiment_id))
+        metric = result.scalars().first()
         
-#         if not metric:
-#             raise HTTPException(status_code=404, detail="Metric not found or you do not have permission to view it.")
+        if not metric:
+            raise HTTPException(status_code=404, detail="Metric not found or you do not have permission to view it.")
         
-#         sample_size = calculate_sample_size(alpha=alpha, power=power, effect_size=effect_size)
+        sample_size = calculate_sample_size(alpha=alpha, power=power, mde=effect_size, p1=base_rate)
     
-#     return {"sample_size": sample_size}
+    return {"sample_size": sample_size}
+
+@router.post("/{experiment_id}/mde")
+async def calculate_mde_endpoint(experiment_id: int, metric_id: int,
+                                   alpha: float = 0.05, 
+                                   power: float = 0.8, 
+                                   sample_size: int = 1000,
+                                   base_rate: float = 0.5,
+                                   session: AsyncSession = Depends(get_session),
+                                   owner: UserReceived = Depends(get_current_user)):
+    
+    async with session:
+        owner_experiment_result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == owner.id))
+        owner_experiment = owner_experiment_result.scalars().first()
+        if not owner_experiment:
+            raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update its metrics.")
+        
+        result = await session.execute(select(Metric).where(Metric.id == metric_id, Metric.experiment_id == experiment_id))
+        metric = result.scalars().first()
+        
+        if not metric:
+            raise HTTPException(status_code=404, detail="Metric not found or you do not have permission to view it.")
+        
+        mde = calculate_minimum_detectable_effect(alpha=alpha, power=power, n=sample_size, p1=base_rate)
+    
+    return {"minimum_detectable_effect": mde}
