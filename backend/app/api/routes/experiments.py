@@ -2,8 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.db.models.experiment_model import Experiment
 from app.db.models.metric_model import Metric, Metric_type, Metric_direction
 from app.db.models.variant_model import Variant
+from app.db.models.analysis_model import Analysis_Run
 from app.db.session import get_session
 from app.stats.calculators import calculate_sample_size, calculate_minimum_detectable_effect
+from app.stats.stat_analysis import test_type, uplift_mode
+from app.stats.summary import decision_summary
+from app.tasks.worker import run_analysis
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.db.models.user_model import UserReceived
@@ -336,3 +340,31 @@ async def calculate_mde_endpoint(experiment_id: int, metric_id: int,
         mde = calculate_minimum_detectable_effect(alpha=alpha, power=power, n=sample_size, p1=base_rate)
     
     return {"minimum_detectable_effect": mde}
+
+@router.post("/{experiment_id}/run-analysis")
+async def run_analysis_task(experiment_id: int, metric_id: int,
+                       variant_a_successes: int, variant_a_total: int,
+                       variant_b_successes: int, variant_b_total: int,
+                       alpha: float = 0.05, uplift_mode: uplift_mode = uplift_mode.ABSOLUTE, 
+                       test_type: test_type = test_type.TWO_SIDED,
+                       session: AsyncSession = Depends(get_session),
+                       owner: UserReceived = Depends(get_current_user)):
+    
+    async with session:
+        owner_experiment_result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == owner.id))
+        owner_experiment = owner_experiment_result.scalars().first()
+        if not owner_experiment:
+            raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update its metrics.")
+        
+        result = await session.execute(select(Metric).where(Metric.id == metric_id, Metric.experiment_id == experiment_id))
+        metric = result.scalars().first()
+        
+        if not metric:
+            raise HTTPException(status_code=404, detail="Metric not found or you do not have permission to view it.")
+        
+        task = run_analysis.delay(experiment_id, metric_id, variant_a_successes, variant_a_total, variant_b_successes, variant_b_total, alpha, uplift_mode, test_type)
+
+        
+
+    
+    return {"analysis_result": analysis_result, "summary_text": summary_text}
