@@ -2,11 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.db.models.experiment_model import Experiment
 from app.db.models.metric_model import Metric, Metric_type, Metric_direction
 from app.db.models.variant_model import Variant
-from app.db.models.analysis_model import Analysis_Run
+from app.db.models.analysis_model import Analysis_Run, Analysis_Run_Status
 from app.db.session import get_session
 from app.stats.calculators import calculate_sample_size, calculate_minimum_detectable_effect
 from app.stats.stat_analysis import test_type, uplift_mode
-from app.stats.summary import decision_summary
 from app.tasks.worker import run_analysis
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -362,9 +361,18 @@ async def run_analysis_task(experiment_id: int, metric_id: int,
         if not metric:
             raise HTTPException(status_code=404, detail="Metric not found or you do not have permission to view it.")
         
-        task = run_analysis.delay(experiment_id, metric_id, variant_a_successes, variant_a_total, variant_b_successes, variant_b_total, alpha, uplift_mode, test_type)
+        task = run_analysis.delay(experiment_id, 
+                                  metric_id, 
+                                  variant_a_successes,
+                                  variant_a_total, 
+                                  variant_b_successes, 
+                                  variant_b_total, 
+                                  alpha, 
+                                  uplift_mode.value, 
+                                  test_type.value)
 
-        
+        analysis_run = Analysis_Run(experiment_id=experiment_id, task_id=task.id, status=Analysis_Run_Status.PENDING)
+        session.add(analysis_run)
+        await session.commit()
+    return {"message": "Analysis task started", "task_id": task.id, "analysis_run_id": analysis_run.id}
 
-    
-    return {"analysis_result": analysis_result, "summary_text": summary_text}
