@@ -83,7 +83,7 @@ async def delete_experiment(experiment_id: int, session: AsyncSession = Depends(
     return {"message": f"Experiment {experiment_id} deleted"}
 
 @router.post("/{experiment_id}/metrics")
-async def create_metric(experiment_id: int, metric_name: str, metric_type: Metric_type = Metric_type.NUMERIC, 
+async def create_metric(experiment_id: int, metric_name: str, metric_type: Metric_type = Metric_type.BINARY,
                         metric_direction: Metric_direction = Metric_direction.UP,
                         is_primary = False, is_guardrail = False, 
                         session: AsyncSession = Depends(get_session),
