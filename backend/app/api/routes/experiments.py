@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 from app.db.models.experiment_model import Experiment
 from app.db.models.metric_model import Metric, Metric_type, Metric_direction
@@ -85,7 +87,7 @@ async def delete_experiment(experiment_id: int, session: AsyncSession = Depends(
 @router.post("/{experiment_id}/metrics")
 async def create_metric(experiment_id: int, metric_name: str, metric_type: Metric_type = Metric_type.BINARY,
                         metric_direction: Metric_direction = Metric_direction.UP,
-                        is_primary = False, is_guardrail = False, 
+                        is_primary: bool = False, is_guardrail: bool = False,
                         session: AsyncSession = Depends(get_session),
                         owner: UserReceived = Depends(get_current_user)):
     
@@ -115,13 +117,13 @@ async def create_metric(experiment_id: int, metric_name: str, metric_type: Metri
 async def get_all_metrics(experiment_id: int, session: AsyncSession = Depends(get_session),
                       owner: UserReceived = Depends(get_current_user)):
     
-    with session:
+    async with session:
         owner_experiment_result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == owner.id))
         owner_experiment = owner_experiment_result.scalars().first()
         if not owner_experiment:
             raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update its metrics.")
-        
-        result = await session.execute(select(Metric).where(Metric.experiment_id == experiment_id, Metric.owner_id == owner.id))
+
+        result = await session.execute(select(Metric).where(Metric.experiment_id == experiment_id))
         metrics = result.scalars().all()
     return {"metrics": metrics}
 
@@ -129,13 +131,13 @@ async def get_all_metrics(experiment_id: int, session: AsyncSession = Depends(ge
 async def get_metric(experiment_id: int, metric_id: int, session: AsyncSession = Depends(get_session),
                      owner: UserReceived = Depends(get_current_user)):
     
-    with session:
+    async with session:
         owner_experiment_result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == owner.id))
         owner_experiment = owner_experiment_result.scalars().first()
         if not owner_experiment:
             raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update its metrics.")
-        
-        result = await session.execute(select(Metric).where(Metric.experiment_id == experiment_id, Metric.id == metric_id, Metric.owner_id == owner.id))
+
+        result = await session.execute(select(Metric).where(Metric.experiment_id == experiment_id, Metric.id == metric_id))
         metrics = result.scalars().all()
         metric = metrics[0] if metrics else None
     if not metric:
@@ -192,12 +194,12 @@ async def delete_metric(experiment_id: int, metric_id: int, session: AsyncSessio
 async def get_all_variants(experiment_id: int, session: AsyncSession = Depends(get_session),
                     owner: UserReceived = Depends(get_current_user)):
     
-    with session:
+    async with session:
         owner_experiment_result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == owner.id))
         owner_experiment = owner_experiment_result.scalars().first()
         if not owner_experiment:
             raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update its variants.")
-        
+
         result = await session.execute(select(Variant).where(Variant.experiment_id == experiment_id))
         variants = result.scalars().all()
     return {"variants": variants}
@@ -206,12 +208,12 @@ async def get_all_variants(experiment_id: int, session: AsyncSession = Depends(g
 async def get_variant(experiment_id: int, variant_id: int, session: AsyncSession = Depends(get_session),
                     owner: UserReceived = Depends(get_current_user)):
         
-        with session:
+        async with session:
             owner_experiment_result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == owner.id))
             owner_experiment = owner_experiment_result.scalars().first()
             if not owner_experiment:
                 raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update its variants.")
-            
+
             result = await session.execute(select(Variant).where(Variant.experiment_id == experiment_id, Variant.id == variant_id))
             variants = result.scalars().all()
             variant = variants[0] if variants else None
@@ -361,18 +363,26 @@ async def run_analysis_task(experiment_id: int, metric_id: int,
         if not metric:
             raise HTTPException(status_code=404, detail="Metric not found or you do not have permission to view it.")
         
-        task = run_analysis.delay(experiment_id, 
-                                  metric_id, 
-                                  variant_a_successes,
-                                  variant_a_total, 
-                                  variant_b_successes, 
-                                  variant_b_total, 
-                                  alpha, 
-                                  uplift_mode.value, 
-                                  test_type.value)
-
-        analysis_run = Analysis_Run(experiment_id=experiment_id, task_id=task.id, status=Analysis_Run_Status.PENDING)
+        # Create the Analysis_Run row (with a task id we control) before
+        # dispatching the task, so a worker that picks it up immediately
+        # always finds a matching row instead of racing this commit.
+        task_id = str(uuid.uuid4())
+        analysis_run = Analysis_Run(experiment_id=experiment_id, task_id=task_id, status=Analysis_Run_Status.PENDING)
         session.add(analysis_run)
         await session.commit()
-    return {"message": "Analysis task started", "task_id": task.id, "analysis_run_id": analysis_run.id}
+        await session.refresh(analysis_run)
+
+        run_analysis.apply_async(
+            args=(experiment_id,
+                  metric_id,
+                  variant_a_successes,
+                  variant_a_total,
+                  variant_b_successes,
+                  variant_b_total,
+                  alpha,
+                  test_type.value,
+                  uplift_mode.value),
+            task_id=task_id,
+        )
+    return {"message": "Analysis task started", "task_id": task_id, "analysis_run_id": analysis_run.id}
 

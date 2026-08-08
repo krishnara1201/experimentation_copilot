@@ -17,6 +17,7 @@ class Experiment(SQLModel, table=True):
     owner_id: int = Field(foreign_key="user.id")
     owner: "User" = Relationship(back_populates="experiments")
     status: Experiment_status = Field(default=Experiment_status.DRAFT, index=True)
+    description: Optional[str] = Field(default=None)
     hypothesis: Optional [str] = Field(default=None)
     unit_of_randomization: Optional[str] = Field(default=None)
     start_date: Optional[date] = Field(default=None)
@@ -27,5 +28,8 @@ class Experiment(SQLModel, table=True):
         sa_relationship=relationship("Metric", cascade="all, delete-orphan")
     )
     variants: List["Variant"] = Relationship(
-        sa_relationship=relationship("Metric", cascade="all, delete-orphan")
+        sa_relationship=relationship("Variant", cascade="all, delete-orphan")
+    )
+    analysis_runs: List["Analysis_Run"] = Relationship(
+        sa_relationship=relationship("Analysis_Run", cascade="all, delete-orphan")
     )

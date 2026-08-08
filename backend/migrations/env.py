@@ -10,6 +10,10 @@ import sqlmodel
 from sqlmodel import SQLModel
 from app.db.models.experiment_model import Experiment
 from app.db.models.user_model import User
+from app.db.models.metric_model import Metric
+from app.db.models.variant_model import Variant
+from app.db.models.analysis_model import Analysis_Run
+from app.db.models.summary_model import Summary
 
 from alembic import context
 

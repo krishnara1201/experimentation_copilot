@@ -62,7 +62,9 @@ class decision_summary:
         if self.summary["srm_p_value"] < 0.05:
             return "Sample Ratio Mismatch (SRM) detected. The allocation of samples between groups may be biased. Further Investigation is needed."
         
-        if self.summary["ci_lower"] <= 0 and self.summary["ci_upper"] >= 0 or self.summary["p_value"] > self.alpha:
+        ci_lower = self.summary["confidence_interval"]["lower"]
+        ci_upper = self.summary["confidence_interval"]["upper"]
+        if ci_lower <= 0 and ci_upper >= 0 or self.summary["p_value"] > self.alpha:
             return "The confidence interval includes zero or p-value is greater than the specified alpha value, indicating that the difference between the two groups is not statistically significant. No conclusive decision can be made."
 
         if self.summary["is_significant"]:

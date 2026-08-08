@@ -13,10 +13,15 @@ class Analysis_Run_Status(str, Enum):
 class Analysis_Run(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     experiment_id: int = Field(foreign_key="experiment.id")
+    task_id: Optional[str] = Field(default=None, index=True)
     status: Analysis_Run_Status = Field(default=Analysis_Run_Status.PENDING, index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     completed_at: Optional[datetime] = Field(default=None)
     error_message: Optional[str] = Field(default=None)
+
+    summaries: List["Summary"] = Relationship(
+        sa_relationship=relationship("Summary", cascade="all, delete-orphan")
+    )
 
 # class Analysis_Result(SQLModel, table=True):
 #     id: Optional[int] = Field(default=None, primary_key=True)
