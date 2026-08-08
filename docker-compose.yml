@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env, copied from .env.example}"
       POSTGRES_DB: ${POSTGRES_DB:-experiment_copilot}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -29,8 +29,8 @@ services:
     build: ./backend
     command: ["uv", "run", "alembic", "upgrade", "head"]
     environment: &backend-env
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-experiment_copilot}
-      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-me}
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env, copied from .env.example}@postgres:5432/${POSTGRES_DB:-experiment_copilot}"
+      SECRET_KEY: "${SECRET_KEY:?Set SECRET_KEY in .env, copied from .env.example (generate one with `openssl rand -hex 32`)}"
       ALGORITHM: ${ALGORITHM:-HS512}
       REDIS_URL: redis://redis:6379/0
       REDIS_BACKEND_URL: redis://redis:6379/1

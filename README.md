@@ -12,17 +12,19 @@ See [CLAUDE.md](./CLAUDE.md) for a deeper architecture walkthrough.
 The fastest way to run the whole stack — Postgres, Redis, the API, the Celery worker, and the frontend — is Docker Compose. Requires [Docker](https://docs.docker.com/get-docker/) with Compose v2 (bundled with Docker Desktop).
 
 ```bash
+cp .env.example .env
+# edit .env: set POSTGRES_PASSWORD and SECRET_KEY (generate one with `openssl rand -hex 32`)
 docker compose up --build
 ```
+
+`.env` is required — `docker compose` reads it automatically, and `POSTGRES_PASSWORD`/`SECRET_KEY` have no built-in default, so it fails immediately with a clear error if either is missing rather than silently starting with a guessable credential. `.env` is gitignored; never commit it.
 
 That builds the images, runs the database migrations (via a one-shot `migrate` service), and starts everything else once they're healthy. First run takes a few minutes; subsequent runs are cached.
 
 - Frontend: http://localhost:3000
 - API: http://localhost:8000 (docs at http://localhost:8000/docs)
-- Postgres: localhost:5432 (`postgres` / `postgres` / `experiment_copilot` by default)
+- Postgres: localhost:5432 (`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` from `.env`)
 - Redis: localhost:6379
-
-To customize ports, credentials, or the API secret, copy `.env.example` to `.env` and edit it — `docker compose` picks it up automatically. **Change `SECRET_KEY` for anything beyond local development.**
 
 Stop everything with `docker compose down` (add `-v` to also drop the Postgres volume and start fresh next time).
 
@@ -57,15 +59,16 @@ Full command reference (migrations, typecheck, etc.) is in [CLAUDE.md](./CLAUDE.
 | Variable | Used by | Purpose | Default (Docker) |
 |---|---|---|---|
 | `DATABASE_URL` | backend | Async Postgres DSN (`postgresql+asyncpg://...`) | derived from `POSTGRES_*` below |
-| `SECRET_KEY` | backend | JWT signing secret | `dev-secret-key-change-me` |
+| `SECRET_KEY` | backend | JWT signing secret | **required, no default** |
 | `ALGORITHM` | backend | JWT signing algorithm | `HS512` |
 | `REDIS_URL` | backend | Celery broker | `redis://redis:6379/0` |
 | `REDIS_BACKEND_URL` | backend | Celery result backend | `redis://redis:6379/1` |
 | `CORS_ORIGINS` | backend | Comma-separated origins allowed to call the API | `http://localhost:3000` |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | docker-compose | Postgres container credentials | `postgres` / `postgres` / `experiment_copilot` |
+| `POSTGRES_USER` / `POSTGRES_DB` | docker-compose | Postgres container user/db name | `postgres` / `experiment_copilot` |
+| `POSTGRES_PASSWORD` | docker-compose | Postgres container password | **required, no default** |
 | `VITE_API_URL` | frontend | API base URL the browser calls (baked in at build time) | `http://localhost:8000` |
 
-See `.env.example` (root, for Docker) and `backend/.env.example` / `frontend/.env.example` (for manual setup) for the full list with working defaults.
+See `.env.example` (root, for Docker — copy to `.env`) and `backend/.env.example` / `frontend/.env.example` (for manual setup) for the full list.
 
 ## Project structure
 
