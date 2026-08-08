@@ -8,6 +8,15 @@ Experimentation Copilot: a B2B A/B-testing platform. FastAPI + Celery backend fo
 
 ## Commands
 
+### Docker (whole stack)
+
+```
+docker compose up --build   # postgres, redis, migrate (one-shot), api, worker, frontend
+docker compose down -v      # stop and drop the postgres volume
+```
+
+Frontend on :3000, API on :8000. Config is env-var driven with working defaults (see root `.env.example`); copy it to `.env` to override.
+
 ### Backend (`backend/`, Python 3.12, managed with `uv`)
 
 ```
@@ -18,7 +27,7 @@ uv run alembic revision --autogenerate -m "message"         # create a migration
 uv run alembic upgrade head                                 # apply migrations
 ```
 
-The API requires Postgres at `DATABASE_URL` and the worker requires Redis at `REDIS_URL`/`REDIS_BACKEND_URL` (see `backend/.env`). There is no test suite or lint/format config in the repo currently.
+The API requires Postgres at `DATABASE_URL` and the worker requires Redis at `REDIS_URL`/`REDIS_BACKEND_URL` (see `backend/.env.example`). There is no test suite or lint/format config in the repo currently.
 
 ### Frontend (`frontend/`, React + TypeScript, Vite)
 
@@ -38,7 +47,7 @@ The API base URL defaults to `http://localhost:8000`; override it by copying `.e
 
 **Domain model** (`app/db/models/`): a `User` owns `Experiment`s; an `Experiment` has many `Metric`s and `Variant`s; an `Analysis_Run` represents one async statistics job for an `Experiment`; a `Summary` holds the JSON + text result of a completed `Analysis_Run`.
 
-**Async analysis pipeline**: `POST /api/experiments/{id}/run-analysis` enqueues a Celery task (`app/tasks/worker.py::run_analysis`). The task computes results via `app/stats/` and writes the `Analysis_Run`/`Summary` rows back using its own fresh `AsyncSession` on the shared `engine` (not the original request's session, since the worker runs in a separate process). Clients poll `GET /api/analysis-runs/{id}` for status.
+**Async analysis pipeline**: `POST /api/experiments/{id}/run-analysis` generates a `task_id` itself, persists the `Analysis_Run` row with it first, then dispatches the Celery task via `apply_async(..., task_id=task_id)` — in that order, so a worker that picks up the task immediately always finds a matching row instead of racing the commit. `app/tasks/worker.py::run_analysis` computes results via `app/stats/` and writes the `Analysis_Run`/`Summary` rows back using its own fresh `AsyncSession` on the shared `engine` (not the original request's session, since the worker runs in a separate process). Clients poll `GET /api/analysis-runs/{id}` for status.
 
 **Stats module** (`app/stats/`) is pure/stateless, split by concern:
 - `calculators.py` — sample-size and MDE (power) calculations.
@@ -47,23 +56,18 @@ The API base URL defaults to `http://localhost:8000`; override it by copying `.e
 
 **Auth**: bcrypt password hashing + JWT bearer tokens (`python-jose`), issued from `POST /api/auth/token` (`OAuth2PasswordRequestForm`) and validated per-request by `get_current_user`.
 
-**Migrations**: Alembic with an async engine, autogenerating off `SQLModel.metadata`. `migrations/env.py` only imports the `Experiment` and `User` models — `Metric`, `Variant`, `Analysis_Run`, and `Summary` need to be imported there too or autogenerate won't see changes to those tables.
+**Migrations**: Alembic with an async engine, autogenerating off `SQLModel.metadata`. `migrations/env.py` imports every model so autogenerate sees the full schema — it originally only imported `Experiment`/`User`, silently missing `Metric`/`Variant`/`Analysis_Run`/`Summary` for three migrations' worth of history; the fix-up migration (`7d771e25734d_...`) creates all four tables plus `experiment.description` in one shot.
 
-**Frontend** (`frontend/src/`): routed with `react-router-dom` behind `ProtectedRoute` (redirects to `/login` when unauthenticated). `context/AuthContext.tsx` holds the JWT (persisted via `api/tokenStore.ts`) and is wired to `api/client.ts`'s 401 handler so an expired/invalid token logs the user out automatically. All backend calls go through `api/client.ts::apiRequest` (adds the `Authorization` header, throws a typed `ApiError`); `api/auth.ts`, `api/experiments.ts`, and `api/analysisRuns.ts` wrap the specific endpoints and mirror the backend's actual query-param/body/response shapes (verified against the live OpenAPI schema, not just the route source — several routes take query params where you'd expect a JSON body, e.g. `POST /api/experiments/`). `pages/ExperimentDetailPage.tsx` is tabbed (Overview/Metrics/Variants/Planning/Analysis), with each tab in `pages/experiment/`. Planning and Analysis take a raw metric ID rather than a dropdown, since the metrics-list endpoint is one of the broken ones below. `pages/UploadPage.tsx` is a stub — there is no backend upload endpoint yet.
+**CORS**: `app/main.py` adds `CORSMiddleware` allowing the origins in `CORS_ORIGINS` (comma-separated, defaults to `http://localhost:3000`) — required for the browser-based frontend to call the API cross-origin (different port = different origin).
 
-## Known rough edges
+**Frontend** (`frontend/src/`): routed with `react-router-dom` behind `ProtectedRoute` (redirects to `/login` when unauthenticated). `context/AuthContext.tsx` holds the JWT (persisted via `api/tokenStore.ts`) and is wired to `api/client.ts`'s 401 handler so an expired/invalid token logs the user out automatically. All backend calls go through `api/client.ts::apiRequest` (adds the `Authorization` header, throws a typed `ApiError`); `api/auth.ts`, `api/experiments.ts`, and `api/analysisRuns.ts` wrap the specific endpoints and mirror the backend's actual query-param/body/response shapes (verified against the live OpenAPI schema, not just the route source — several routes take query params where you'd expect a JSON body, e.g. `POST /api/experiments/`). `pages/ExperimentDetailPage.tsx` is tabbed (Overview/Metrics/Variants/Planning/Analysis), with each tab in `pages/experiment/`. Planning and Analysis take a raw metric ID rather than a dropdown (built before the metrics-list endpoint was fixed; still simpler than round-tripping a fetch just to populate a `<select>`). `pages/UploadPage.tsx` is a stub — there is no backend upload endpoint yet.
 
-Two enum bugs used to crash the app at import time — `Metric.type`'s default was `Metric_type.binary` (lowercase; the enum member is `BINARY`) and the metrics-creation route defaulted to a nonexistent `Metric_type.NUMERIC`. Both are fixed, so the app now imports and boots cleanly (verified with `uv run python -c "import app.main"` and a live `/openapi.json` fetch — no Postgres/Redis needed for that much).
+## Verifying the backend end-to-end without a persistent Postgres/Redis
 
-The rest of these are still open and will surface as runtime errors rather than at import time — worth knowing before you assume you (or the frontend) broke something:
+The full flow (auth → experiment/metric/variant CRUD → planning → run-analysis → poll → summary/result, including cascade deletes) can be exercised without standing up real infrastructure:
 
-- `Analysis_Run` (`db/models/analysis_model.py`) has no `task_id` or `error` field, but `experiments.py` and `worker.py` read/write `task_id`, and `worker.py`/`analysis.py` read/write `.error` (the actual field is `error_message`). This means `POST /{experiment_id}/run-analysis` 500s when it tries to construct `Analysis_Run(..., task_id=...)`.
-- `Summary` has `summary_json`, not `summary_data` — `worker.py` and `app/api/routes/analysis.py` use `summary_data`.
-- `decision_summary.__init__` (`stats/summary.py`) takes `mode=`, but `worker.py` calls it with `uplift_mode=`.
-- `decision_summary.generate_summary_text()` reads `self.summary["ci_lower"]`/`["ci_upper"]`, but `generate_summary()` actually nests them under `summary["confidence_interval"]["lower"/"upper"]`.
-- `poll_status` (`GET /api/analysis-runs/{analysis_run_id}`) declares `response_model=list[Summary]` but returns a single dict — FastAPI response validation will reject it.
-- `Experiment.variants` (`db/models/experiment_model.py`) is wired to the `Metric` class instead of `Variant`.
-- `create_experiment` passes `description=` into `Experiment(...)`, which has no such field (it has `hypothesis` instead) — the same mismatch breaks `update_experiment` (`PATCH /{experiment_id}`), which assigns `experiment_details.description`.
-- `get_all_metrics`/`get_metric` filter on `Metric.owner_id`, which doesn't exist on the `Metric` model — both 500.
+- An ephemeral Postgres via the `pgserver` PyPI package (`uv run --with pgserver python -c "import pgserver; db = pgserver.get_server('/some/tmp/dir'); print(db.get_uri())"` — ships real Postgres binaries, no system install or Docker needed) gives a real `postgresql+asyncpg://` DSN to run `alembic upgrade head` and the app against.
+- The Celery worker can be tested without Redis by calling `run_analysis.apply(args=..., task_id=...)` instead of `.delay()`/`.apply_async()` — `.apply()` executes the task body synchronously with no broker at all. Run it in a real OS thread (not just `await`ed inline), since the task body calls `asyncio.run(...)` internally, matching how a real, separate Celery worker process behaves; calling it inline from the same event loop driving the test's HTTP client raises "cannot be called from a running event loop." Give that thread its own SQLAlchemy engine (`NullPool`) rather than reusing the app's shared `engine` — asyncpg connections aren't safe to use across event loops, and sharing the pool across threads corrupts it for later requests on the main loop.
+- `httpx.AsyncClient(transport=httpx.ASGITransport(app=app), ...)` drives real requests through the full FastAPI app in-process (auth, serialization, everything) without binding a port.
 
-Net effect: experiment CRUD (create/list/get/delete), variant CRUD, and the sample-size/MDE calculators work end-to-end against a live Postgres. Metric list/get, experiment update, and the entire run-analysis → poll → summary/result pipeline do not, until the bugs above are fixed. The frontend (`frontend/src/`) is built against the correct/intended contracts regardless, so it's ready to go once these are fixed — errors from the broken endpoints surface as an in-app error banner rather than a crash.
+This combination is how the current backend was actually verified (not just read) after the last round of bug fixes — worth reaching for again before trusting that a backend change works, since this codebase has a track record of bugs that only surface at runtime (wrong kwarg names, type mismatches, response-model mismatches) rather than at import time.

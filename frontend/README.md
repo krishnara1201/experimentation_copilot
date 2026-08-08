@@ -1,73 +1,50 @@
-# B2B Analytics Frontend
+# Experimentation Copilot Frontend
 
-This project is a B2B analytics frontend built with React and TypeScript, utilizing Vite for fast development and build processes. The application is designed to provide a clean and efficient interface for managing experiments and analyzing results.
+React + TypeScript frontend for the Experimentation Copilot platform, built with Vite.
+
+See the [root README](../README.md) for the full stack quickstart (Docker or manual), and [CLAUDE.md](../CLAUDE.md) for architecture details.
 
 ## Features
 
-- **Experiments List**: View and manage a list of experiments with status indicators and quick actions.
-- **Create Experiment Wizard**: A multi-step wizard to guide users through the experiment creation process.
-- **Planning Page**: Tools for designing experiments, including sample-size cards and assumption editors.
-- **Upload Page**: Functionality for uploading analysis inputs, including CSV uploads.
-- **Results Dashboard**: Analyze experiment outcomes with KPI cards and visualizations.
-- **Summary Page**: Present final decisions with recommendations and export options.
-- **Authentication**: User registration and login functionality.
+- **Auth**: register/login, JWT persisted client-side, protected routes.
+- **Experiments**: create, list, and manage experiments.
+- **Metrics & Variants**: define per-experiment metrics and variants.
+- **Planning**: sample-size and minimum-detectable-effect calculators.
+- **Analysis**: run the statistical analysis pipeline and view results.
+- **Upload**: placeholder page — the backend doesn't have an upload endpoint yet.
 
-## Technologies Used
+## Technologies
 
-- **React**: A JavaScript library for building user interfaces.
-- **TypeScript**: A typed superset of JavaScript that compiles to plain JavaScript.
-- **Vite**: A fast build tool and development server.
-- **TanStack Query**: For server-state management and data fetching.
-- **Tailwind CSS**: A utility-first CSS framework for styling.
-- **Plotly/Recharts**: Libraries for rendering interactive charts and visualizations.
+- **React** + **TypeScript**
+- **Vite** for dev server and builds
+- **TanStack Query** for server state
+- **react-router-dom** for routing
+- **Tailwind CSS** for styling
 
-## Getting Started
+## Getting started
 
-To get started with the project, follow these steps:
-
-1. **Clone the repository**:
-   ```
-   git clone <repository-url>
-   cd b2b-analytics-frontend
-   ```
-
-2. **Install dependencies**:
-   ```
-   npm install
-   ```
-
-3. **Run the development server**:
-   ```
-   npm run dev
-   ```
-
-4. **Open your browser**:
-   Navigate to `http://localhost:3000` to view the application.
-
-## Folder Structure
-
-```
-frontend
-├── public
-├── src
-│   ├── components
-│   ├── pages
-│   ├── hooks
-│   ├── services
-│   ├── styles
-│   ├── utils
-│   ├── App.tsx
-│   └── main.tsx
-├── package.json
-├── tsconfig.json
-├── tailwind.config.js
-└── README.md
+```bash
+npm install
+npm run dev
 ```
 
-## Contributing
+Runs on http://localhost:3000 and expects the API at `http://localhost:8000` by default — override with `VITE_API_URL` (see `.env.example`).
 
-Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
+## Scripts
 
-## License
+- `npm run dev` — start the Vite dev server
+- `npm run typecheck` — `tsc --noEmit`
+- `npm run build` — typecheck + production build
+- `npm run serve` — preview a production build locally
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+## Folder structure
+
+```
+src/
+├── api/            typed fetch client + per-resource API calls
+├── components/     shared UI (Layout, ProtectedRoute, ui/ primitives)
+├── context/        AuthContext (token, login/register/logout)
+├── pages/          route-level pages, experiment/ tabs under pages/experiment/
+├── types/          TypeScript types mirroring the backend's schemas
+└── styles/         Tailwind entry point
+```
