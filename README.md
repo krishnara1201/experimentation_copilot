@@ -28,6 +28,8 @@ That builds the images, runs the database migrations (via a one-shot `migrate` s
 
 Stop everything with `docker compose down` (add `-v` to also drop the Postgres volume and start fresh next time).
 
+**Port already in use?** Common if you have a native Postgres/Redis install (e.g. a Windows Postgres service auto-started on 5432). Set `POSTGRES_PORT`, `REDIS_PORT`, `API_PORT`, and/or `FRONTEND_PORT` in `.env` to remap the *host* side only — the containers still talk to each other over the internal Docker network regardless. If you change `API_PORT`, also update `FRONTEND_API_URL` to match, since that's what the browser calls.
+
 ## Manual setup (without Docker)
 
 Useful for backend/frontend development with hot reload. Requires Python 3.12, [uv](https://docs.astral.sh/uv/), Node.js 20+, a local PostgreSQL instance, and (only if you need the analysis pipeline) Redis.
@@ -66,6 +68,7 @@ Full command reference (migrations, typecheck, etc.) is in [CLAUDE.md](./CLAUDE.
 | `CORS_ORIGINS` | backend | Comma-separated origins allowed to call the API | `http://localhost:3000` |
 | `POSTGRES_USER` / `POSTGRES_DB` | docker-compose | Postgres container user/db name | `postgres` / `experiment_copilot` |
 | `POSTGRES_PASSWORD` | docker-compose | Postgres container password | **required, no default** |
+| `POSTGRES_PORT` / `REDIS_PORT` / `API_PORT` / `FRONTEND_PORT` | docker-compose | Host-side published ports (remap if one's already taken) | `5432` / `6379` / `8000` / `3000` |
 | `VITE_API_URL` | frontend | API base URL the browser calls (baked in at build time) | `http://localhost:8000` |
 
 See `.env.example` (root, for Docker — copy to `.env`) and `backend/.env.example` / `frontend/.env.example` (for manual setup) for the full list.
