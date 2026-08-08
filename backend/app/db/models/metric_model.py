@@ -18,7 +18,7 @@ class Metric(SQLModel, table=True):
     name: str = Field(index=True)
     experiment_id: int = Field(foreign_key="experiment.id")
     direction: Metric_direction = Field(default=Metric_direction.UP, index=True)
-    type: Metric_type = Field(default=Metric_type.binary, index=True)
+    type: Metric_type = Field(default=Metric_type.BINARY, index=True)
     is_primary: bool = Field(default=False)
     is_guardrail: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
