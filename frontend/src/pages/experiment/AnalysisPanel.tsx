@@ -3,12 +3,21 @@ import { useState, type FormEvent } from 'react';
 import { getAnalysisRunStatus } from '../../api/analysisRuns';
 import { getErrorMessage } from '../../api/client';
 import { runAnalysis } from '../../api/experiments';
+import Badge, { type BadgeTone } from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import ErrorBanner from '../../components/ui/ErrorBanner';
 import Field from '../../components/ui/Field';
 import Select from '../../components/ui/Select';
 import type { TestType, UpliftMode } from '../../types/api';
+
+function statusTone(status: string): BadgeTone {
+  const value = status.toLowerCase();
+  if (value.includes('success') || value.includes('complete')) return 'green';
+  if (value.includes('fail') || value.includes('error')) return 'red';
+  if (value.includes('pending') || value.includes('start') || value.includes('progress')) return 'amber';
+  return 'slate';
+}
 
 export default function AnalysisPanel({ experimentId }: { experimentId: number }) {
   const [metricId, setMetricId] = useState('');
@@ -46,7 +55,7 @@ export default function AnalysisPanel({ experimentId }: { experimentId: number }
   return (
     <div className="space-y-6">
       <Card>
-        <h3 className="mb-4 text-base font-semibold">Run analysis</h3>
+        <h3 className="mb-4 text-base font-semibold text-slate-900">Run analysis</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
@@ -133,7 +142,7 @@ export default function AnalysisPanel({ experimentId }: { experimentId: number }
 
       {runMutation.isSuccess && (
         <Card>
-          <h3 className="mb-4 text-base font-semibold">Check status</h3>
+          <h3 className="mb-4 text-base font-semibold text-slate-900">Check status</h3>
           <Button
             variant="secondary"
             onClick={() => statusMutation.mutate(runMutation.data.analysis_run_id)}
@@ -147,9 +156,24 @@ export default function AnalysisPanel({ experimentId }: { experimentId: number }
             </div>
           )}
           {statusMutation.isSuccess && (
-            <pre className="mt-4 overflow-x-auto rounded-md bg-slate-50 p-4 text-xs text-slate-700">
-              {JSON.stringify(statusMutation.data, null, 2)}
-            </pre>
+            <dl className="mt-4 grid grid-cols-2 gap-4 rounded-lg bg-slate-50 p-4">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Run ID</dt>
+                <dd className="mt-1 text-sm font-medium text-slate-900">#{statusMutation.data.id}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Status</dt>
+                <dd className="mt-1">
+                  <Badge tone={statusTone(statusMutation.data.status)}>{statusMutation.data.status}</Badge>
+                </dd>
+              </div>
+              {statusMutation.data.error && (
+                <div className="col-span-2">
+                  <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Error</dt>
+                  <dd className="mt-1 text-sm text-red-700">{statusMutation.data.error}</dd>
+                </div>
+              )}
+            </dl>
           )}
         </Card>
       )}
