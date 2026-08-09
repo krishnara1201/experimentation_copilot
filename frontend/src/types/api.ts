@@ -15,6 +15,7 @@ export interface User {
 export interface Experiment {
   id: number;
   name: string;
+  description: string | null;
   owner_id: number;
   status: ExperimentStatus;
   hypothesis: string | null;

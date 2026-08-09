@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { LineChart, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { getErrorMessage } from '../../api/client';
 import { createMetric, deleteMetric, listMetrics } from '../../api/experiments';
+import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
+import EmptyState from '../../components/ui/EmptyState';
 import ErrorBanner from '../../components/ui/ErrorBanner';
 import Field from '../../components/ui/Field';
 import Select from '../../components/ui/Select';
@@ -62,7 +65,7 @@ export default function MetricsPanel({ experimentId }: { experimentId: number })
   return (
     <div className="space-y-6">
       <Card>
-        <h3 className="mb-4 text-base font-semibold">Add metric</h3>
+        <h3 className="mb-4 text-base font-semibold text-slate-900">Add metric</h3>
         <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
           <Field label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
           <Select label="Type" value={type} onChange={(event) => setType(event.target.value as MetricType)}>
@@ -80,7 +83,12 @@ export default function MetricsPanel({ experimentId }: { experimentId: number })
           </Select>
           <div className="flex items-end gap-6 pb-2">
             <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" checked={isPrimary} onChange={(event) => setIsPrimary(event.target.checked)} />
+              <input
+                type="checkbox"
+                checked={isPrimary}
+                onChange={(event) => setIsPrimary(event.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary-100"
+              />
               Primary
             </label>
             <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -88,6 +96,7 @@ export default function MetricsPanel({ experimentId }: { experimentId: number })
                 type="checkbox"
                 checked={isGuardrail}
                 onChange={(event) => setIsGuardrail(event.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary-100"
               />
               Guardrail
             </label>
@@ -107,21 +116,30 @@ export default function MetricsPanel({ experimentId }: { experimentId: number })
 
       {isLoading && <Spinner />}
       {isError && <ErrorBanner message={getErrorMessage(error, 'Failed to load metrics.')} />}
-      {data && data.metrics.length === 0 && <p className="text-sm text-slate-500">No metrics yet.</p>}
+      {data && data.metrics.length === 0 && (
+        <EmptyState
+          icon={<LineChart className="h-5 w-5" />}
+          title="No metrics yet"
+          description="Add a metric above to start tracking it for this experiment."
+        />
+      )}
       {data && data.metrics.length > 0 && (
-        <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
           {data.metrics.map((metric: Metric) => (
             <li key={metric.id} className="flex items-center justify-between px-4 py-3">
               <div>
                 <p className="font-medium text-slate-900">{metric.name}</p>
-                <p className="text-xs text-slate-500">
-                  {metric.type} · {metric.direction}
-                  {metric.is_primary && ' · primary'}
-                  {metric.is_guardrail && ' · guardrail'}
-                </p>
+                <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                  <span>
+                    {metric.type} · {metric.direction}
+                  </span>
+                  {metric.is_primary && <Badge tone="blue">primary</Badge>}
+                  {metric.is_guardrail && <Badge tone="amber">guardrail</Badge>}
+                </div>
               </div>
               <Button
-                variant="secondary"
+                variant="ghost"
+                icon={<Trash2 className="h-4 w-4" />}
                 onClick={() => deleteMutation.mutate(metric.id)}
                 disabled={deleteMutation.isPending}
               >

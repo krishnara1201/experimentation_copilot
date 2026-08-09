@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Layers, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { getErrorMessage } from '../../api/client';
 import { createVariant, deleteVariant, listVariants } from '../../api/experiments';
+import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
+import EmptyState from '../../components/ui/EmptyState';
 import ErrorBanner from '../../components/ui/ErrorBanner';
 import Field from '../../components/ui/Field';
 import Spinner from '../../components/ui/Spinner';
@@ -56,7 +59,7 @@ export default function VariantsPanel({ experimentId }: { experimentId: number }
   return (
     <div className="space-y-6">
       <Card>
-        <h3 className="mb-4 text-base font-semibold">Add variant</h3>
+        <h3 className="mb-4 text-base font-semibold text-slate-900">Add variant</h3>
         <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-3">
           <Field label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
           <Field
@@ -68,7 +71,12 @@ export default function VariantsPanel({ experimentId }: { experimentId: number }
             onChange={(event) => setAllocation(Number(event.target.value))}
           />
           <label className="flex items-end gap-2 pb-2 text-sm text-slate-700">
-            <input type="checkbox" checked={isControl} onChange={(event) => setIsControl(event.target.checked)} />
+            <input
+              type="checkbox"
+              checked={isControl}
+              onChange={(event) => setIsControl(event.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary-100"
+            />
             Control
           </label>
           {formError && (
@@ -86,20 +94,27 @@ export default function VariantsPanel({ experimentId }: { experimentId: number }
 
       {isLoading && <Spinner />}
       {isError && <ErrorBanner message={getErrorMessage(error, 'Failed to load variants.')} />}
-      {data && data.variants.length === 0 && <p className="text-sm text-slate-500">No variants yet.</p>}
+      {data && data.variants.length === 0 && (
+        <EmptyState
+          icon={<Layers className="h-5 w-5" />}
+          title="No variants yet"
+          description="Add a variant above, such as a control and a treatment."
+        />
+      )}
       {data && data.variants.length > 0 && (
-        <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
           {data.variants.map((variant: Variant) => (
             <li key={variant.id} className="flex items-center justify-between px-4 py-3">
               <div>
-                <p className="font-medium text-slate-900">
+                <p className="flex items-center gap-2 font-medium text-slate-900">
                   {variant.name}
-                  {variant.is_control && <span className="ml-2 text-xs text-slate-500">(control)</span>}
+                  {variant.is_control && <Badge tone="slate">control</Badge>}
                 </p>
-                <p className="text-xs text-slate-500">{variant.allocation_percentage}% allocation</p>
+                <p className="mt-1 text-xs text-slate-500">{variant.allocation_percentage}% allocation</p>
               </div>
               <Button
-                variant="secondary"
+                variant="ghost"
+                icon={<Trash2 className="h-4 w-4" />}
                 onClick={() => deleteMutation.mutate(variant.id)}
                 disabled={deleteMutation.isPending}
               >

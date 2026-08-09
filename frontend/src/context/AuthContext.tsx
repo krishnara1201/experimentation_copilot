@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { login as loginRequest, registerUser } from '../api/auth';
 import { setUnauthorizedHandler } from '../api/client';
+import { decodeUsername } from '../api/jwt';
 import { getToken, setToken as persistToken } from '../api/tokenStore';
 
 interface AuthContextValue {
   isAuthenticated: boolean;
+  username: string | null;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -40,7 +42,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo<AuthContextValue>(
-    () => ({ isAuthenticated: token !== null, login, register, logout }),
+    () => ({
+      isAuthenticated: token !== null,
+      username: token ? decodeUsername(token) : null,
+      login,
+      register,
+      logout,
+    }),
     [token]
   );
 

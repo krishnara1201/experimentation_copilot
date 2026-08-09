@@ -7,6 +7,15 @@ import Card from '../../components/ui/Card';
 import ErrorBanner from '../../components/ui/ErrorBanner';
 import Field from '../../components/ui/Field';
 
+function ResultStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="mt-4 rounded-lg bg-primary-50 px-4 py-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-primary-700">{label}</p>
+      <p className="mt-1 text-xl font-bold text-primary-900">{value}</p>
+    </div>
+  );
+}
+
 export default function PlanningPanel({ experimentId }: { experimentId: number }) {
   return (
     <div className="grid gap-6 sm:grid-cols-2">
@@ -42,7 +51,7 @@ function SampleSizeCard({ experimentId }: { experimentId: number }) {
 
   return (
     <Card>
-      <h3 className="mb-4 text-base font-semibold">Sample size calculator</h3>
+      <h3 className="mb-4 text-base font-semibold text-slate-900">Sample size calculator</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field
           label="Metric ID"
@@ -86,9 +95,7 @@ function SampleSizeCard({ experimentId }: { experimentId: number }) {
         </Button>
         {mutation.isError && <ErrorBanner message={getErrorMessage(mutation.error, 'Calculation failed.')} />}
         {mutation.isSuccess && (
-          <p className="text-sm text-slate-700">
-            Required sample size per variant: <span className="font-semibold">{mutation.data.sample_size}</span>
-          </p>
+          <ResultStat label="Required sample size per variant" value={String(mutation.data.sample_size)} />
         )}
       </form>
     </Card>
@@ -121,7 +128,7 @@ function MdeCard({ experimentId }: { experimentId: number }) {
 
   return (
     <Card>
-      <h3 className="mb-4 text-base font-semibold">Minimum detectable effect</h3>
+      <h3 className="mb-4 text-base font-semibold text-slate-900">Minimum detectable effect</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field
           label="Metric ID"
@@ -164,10 +171,10 @@ function MdeCard({ experimentId }: { experimentId: number }) {
         </Button>
         {mutation.isError && <ErrorBanner message={getErrorMessage(mutation.error, 'Calculation failed.')} />}
         {mutation.isSuccess && (
-          <p className="text-sm text-slate-700">
-            Minimum detectable effect:{' '}
-            <span className="font-semibold">{mutation.data.minimum_detectable_effect.toFixed(4)}</span>
-          </p>
+          <ResultStat
+            label="Minimum detectable effect"
+            value={mutation.data.minimum_detectable_effect.toFixed(4)}
+          />
         )}
       </form>
     </Card>

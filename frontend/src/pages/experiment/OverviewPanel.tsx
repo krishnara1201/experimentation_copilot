@@ -1,11 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deleteExperiment } from '../../api/experiments';
 import { getErrorMessage } from '../../api/client';
+import { deleteExperiment } from '../../api/experiments';
+import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import ErrorBanner from '../../components/ui/ErrorBanner';
+import { statusTone } from '../../lib/statusTone';
 import type { Experiment } from '../../types/api';
 
 function formatDate(value: string | null): string {
@@ -34,7 +37,7 @@ export default function OverviewPanel({ experiment }: { experiment: Experiment }
   };
 
   const fields: Array<[string, string]> = [
-    ['Status', experiment.status],
+    ['Description', experiment.description ?? '—'],
     ['Hypothesis', experiment.hypothesis ?? '—'],
     ['Unit of randomization', experiment.unit_of_randomization ?? '—'],
     ['Start date', experiment.start_date ?? '—'],
@@ -44,7 +47,11 @@ export default function OverviewPanel({ experiment }: { experiment: Experiment }
 
   return (
     <Card>
-      <dl className="grid gap-4 sm:grid-cols-2">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <span className="text-sm font-medium text-slate-500">Status</span>
+        <Badge tone={statusTone[experiment.status] ?? 'slate'}>{experiment.status}</Badge>
+      </div>
+      <dl className="mt-4 grid gap-4 sm:grid-cols-2">
         {fields.map(([label, value]) => (
           <div key={label}>
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
@@ -57,8 +64,13 @@ export default function OverviewPanel({ experiment }: { experiment: Experiment }
           <ErrorBanner message={error} />
         </div>
       )}
-      <div className="mt-6">
-        <Button variant="danger" onClick={handleDelete} disabled={deleteMutation.isPending}>
+      <div className="mt-6 border-t border-slate-100 pt-6">
+        <Button
+          variant="danger"
+          icon={<Trash2 className="h-4 w-4" />}
+          onClick={handleDelete}
+          disabled={deleteMutation.isPending}
+        >
           {deleteMutation.isPending ? 'Deleting…' : 'Delete experiment'}
         </Button>
       </div>
