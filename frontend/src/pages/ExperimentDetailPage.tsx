@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, BarChart3, Calculator, ClipboardList, Layers, LineChart } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getErrorMessage } from '../api/client';
@@ -12,11 +13,11 @@ import PlanningPanel from './experiment/PlanningPanel';
 import VariantsPanel from './experiment/VariantsPanel';
 
 const tabs = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'metrics', label: 'Metrics' },
-  { key: 'variants', label: 'Variants' },
-  { key: 'planning', label: 'Planning' },
-  { key: 'analysis', label: 'Analysis' },
+  { key: 'overview', label: 'Overview', icon: ClipboardList },
+  { key: 'metrics', label: 'Metrics', icon: LineChart },
+  { key: 'variants', label: 'Variants', icon: Layers },
+  { key: 'planning', label: 'Planning', icon: Calculator },
+  { key: 'analysis', label: 'Analysis', icon: BarChart3 },
 ] as const;
 
 type TabKey = (typeof tabs)[number]['key'];
@@ -39,10 +40,14 @@ export default function ExperimentDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/experiments" className="text-sm text-primary hover:underline">
-          ← Back to experiments
+        <Link
+          to="/experiments"
+          className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to experiments
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold">
+        <h1 className="mt-2 text-2xl font-bold text-slate-900">
           {data ? data.experiment.name : isLoading ? 'Loading…' : 'Experiment'}
         </h1>
       </div>
@@ -52,18 +57,19 @@ export default function ExperimentDetailPage() {
 
       {data && (
         <>
-          <div className="flex gap-2 border-b border-slate-200">
+          <div className="flex gap-1 border-b border-slate-200">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
+                className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
                   activeTab === tab.key
                     ? 'border-primary text-primary'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
+                <tab.icon className="h-4 w-4" />
                 {tab.label}
               </button>
             ))}
