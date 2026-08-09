@@ -55,8 +55,8 @@ export default function ExperimentsListPage() {
                 <p className="font-semibold text-slate-900">{experiment.name}</p>
                 <Badge tone={statusTone[experiment.status] ?? 'slate'}>{experiment.status}</Badge>
               </div>
-              {experiment.hypothesis && (
-                <p className="mt-2 truncate text-sm text-slate-500">{experiment.hypothesis}</p>
+              {experiment.description && (
+                <p className="mt-2 truncate text-sm text-slate-500">{experiment.description}</p>
               )}
             </Link>
           ))}

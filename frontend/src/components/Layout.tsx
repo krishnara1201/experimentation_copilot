@@ -1,5 +1,5 @@
 import { Beaker, FlaskConical, LogOut, Upload } from 'lucide-react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
@@ -9,6 +9,7 @@ const navItems = [
 
 export default function Layout() {
   const { logout, username } = useAuth();
+  const navigate = useNavigate();
   const initial = username ? username.charAt(0).toUpperCase() : '?';
 
   return (
@@ -40,7 +41,7 @@ export default function Layout() {
               </div>
               <button
                 type="button"
-                onClick={logout}
+                onClick={() => { logout(); navigate('/'); }}
                 className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                 aria-label="Log out"
                 title="Log out"
