@@ -1,4 +1,5 @@
 import os
+import sys
 import uuid
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 # Set auth env before importing app modules that read them at import time.
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("ALGORITHM", "HS512")
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./tests_bootstrap.db")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.main import app  # noqa: E402
 from app.db import session as session_module  # noqa: E402

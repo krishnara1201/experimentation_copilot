@@ -6,7 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.models.analysis_model import Analysis_Run, Analysis_Run_Status
 from app.db.models.summary_model import Summary
-from app.db.session import engine
+from app.db import session as session_module
 from app.tasks.worker import run_analysis
 
 
@@ -51,7 +51,7 @@ async def test_analysis_summary_and_result_endpoints(client, auth_headers, seede
     experiment_id = seeded_experiment["experiment"]["id"]
     task_id = str(uuid.uuid4())
 
-    async with AsyncSession(engine) as session:
+    async with AsyncSession(session_module.engine) as session:
         run = Analysis_Run(experiment_id=experiment_id, task_id=task_id, status=Analysis_Run_Status.COMPLETED)
         session.add(run)
         await session.commit()
