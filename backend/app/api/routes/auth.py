@@ -35,8 +35,9 @@ async def create_user(
         
         # Fixed keyword argument mapping here
         user = User(
-            username=payload.username, 
-            email=payload.email, 
+            username=payload.username,
+            email=payload.email,
+            full_name=payload.full_name,
             hashed_password=hashed_password
         )
     except ValueError as e:
