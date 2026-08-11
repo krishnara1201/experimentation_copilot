@@ -33,3 +33,13 @@ class Experiment(SQLModel, table=True):
     analysis_runs: List["Analysis_Run"] = Relationship(
         sa_relationship=relationship("Analysis_Run", cascade="all, delete-orphan")
     )
+
+
+class ExperimentUpdate(SQLModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    hypothesis: Optional[str] = None
+    unit_of_randomization: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    status: Optional[Experiment_status] = None

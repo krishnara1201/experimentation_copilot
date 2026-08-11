@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from app.db.models.experiment_model import Experiment
+from app.db.models.experiment_model import Experiment, ExperimentUpdate
 from app.db.models.metric_model import Metric, Metric_type, Metric_direction
 from app.db.models.variant_model import Variant
 from app.db.models.analysis_model import Analysis_Run, Analysis_Run_Status
@@ -51,23 +51,24 @@ async def get_experiment(experiment_id: int, session: AsyncSession = Depends(get
     return {"experiment": experiment}
 
 @router.patch("/{experiment_id}")
-async def update_experiment(experiment_id: int, experiment_details: Experiment, 
+async def update_experiment(experiment_id: int, experiment_details: ExperimentUpdate,
                             session: AsyncSession = Depends(get_session),
                             user: UserReceived = Depends(get_current_user)):
-    
+
     async with session:
         result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == user.id))
         existing_experiment = result.scalars().first()
-        
+
         if not existing_experiment:
             raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update it.")
-        
-        existing_experiment.name = experiment_details.name
-        existing_experiment.description = experiment_details.description
-        
+
+        updates = experiment_details.model_dump(exclude_unset=True)
+        for field, value in updates.items():
+            setattr(existing_experiment, field, value)
+
         await session.commit()
         await session.refresh(existing_experiment)
-    return {"message": f"Experiment {experiment_id} updated"}
+    return {"message": f"Experiment {experiment_id} updated", "experiment": existing_experiment}
 
 @router.delete("/{experiment_id}")
 async def delete_experiment(experiment_id: int, session: AsyncSession = Depends(get_session),
