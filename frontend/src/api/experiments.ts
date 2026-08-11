@@ -84,12 +84,13 @@ export interface SampleSizeInput {
   power?: number;
   effect_size?: number;
   base_rate?: number;
+  std_dev?: number;
 }
 
 export function calculateSampleSize(
   experimentId: number,
   input: SampleSizeInput
-): Promise<{ sample_size: number }> {
+): Promise<{ sample_size: number; metric_type: MetricType }> {
   return apiRequest(`/api/experiments/${experimentId}/sample-size`, { method: 'POST', params: { ...input } });
 }
 
@@ -99,21 +100,26 @@ export interface MdeInput {
   power?: number;
   sample_size?: number;
   base_rate?: number;
+  std_dev?: number;
 }
 
 export function calculateMde(
   experimentId: number,
   input: MdeInput
-): Promise<{ minimum_detectable_effect: number }> {
+): Promise<{ minimum_detectable_effect: number; metric_type: MetricType }> {
   return apiRequest(`/api/experiments/${experimentId}/mde`, { method: 'POST', params: { ...input } });
 }
 
 export interface RunAnalysisInput {
   metric_id: number;
-  variant_a_successes: number;
   variant_a_total: number;
-  variant_b_successes: number;
   variant_b_total: number;
+  variant_a_successes?: number;
+  variant_b_successes?: number;
+  variant_a_mean?: number;
+  variant_a_std?: number;
+  variant_b_mean?: number;
+  variant_b_std?: number;
   alpha?: number;
   uplift_mode?: UpliftMode;
   test_type?: TestType;

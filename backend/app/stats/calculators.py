@@ -55,7 +55,61 @@ def calculate_minimum_detectable_effect(
     
     # Standard error approximation assuming p1 is close to p2
     standard_error = ((2 * p1 * (1 - p1)) / n) ** 0.5
-    
+
     # Calculate absolute MDE
     mde = (z_alpha + z_beta) * standard_error
     return mde
+
+def calculate_sample_size_continuous(
+    sigma: float,
+    mde: float = 1.0,
+    alpha: float = 0.05,
+    power: float = 0.8
+) -> int:
+    """
+    Calculate the required per-variant sample size for detecting a given
+    absolute difference in means between two groups, given the metric's
+    standard deviation (assumed equal across groups).
+
+    Args:
+        sigma (float): Standard deviation of the metric.
+        mde (float): Minimum detectable effect, in the metric's own units.
+        alpha (float): Significance level (default is 0.05).
+        power (float): Statistical power (default is 0.8).
+
+    Returns:
+        int: The calculated sample size per variant.
+    """
+    z_alpha = stats.norm.ppf(1 - alpha / 2)
+    z_beta = stats.norm.ppf(power)
+
+    numerator = 2 * (z_alpha + z_beta) ** 2 * sigma ** 2
+    denominator = mde ** 2
+
+    return math.ceil(numerator / denominator)
+
+def calculate_minimum_detectable_effect_continuous(
+    sigma: float,
+    n: int = 1000,
+    alpha: float = 0.05,
+    power: float = 0.8
+) -> float:
+    """
+    Calculate the minimum detectable effect (MDE), in the metric's own
+    units, for a given per-variant sample size and standard deviation.
+
+    Args:
+        sigma (float): Standard deviation of the metric.
+        n (int): Sample size per variant.
+        alpha (float): Significance level (default is 0.05).
+        power (float): Statistical power (default is 0.8).
+
+    Returns:
+        float: The calculated minimum detectable effect.
+    """
+    z_alpha = stats.norm.ppf(1 - alpha / 2)
+    z_beta = stats.norm.ppf(power)
+
+    standard_error = sigma * (2 / n) ** 0.5
+
+    return (z_alpha + z_beta) * standard_error

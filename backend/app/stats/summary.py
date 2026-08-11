@@ -1,15 +1,46 @@
-from app.stats.stat_analysis import calculate_result_significance, calculate_result_ci, calculate_srm, calculate_uplift, calculate_result_p_value, test_type, uplift_mode
+from app.db.models.metric_model import Metric_type
+from app.stats.stat_analysis import (
+    calculate_result_significance,
+    calculate_result_significance_continuous,
+    calculate_result_ci,
+    calculate_result_ci_continuous,
+    calculate_srm,
+    calculate_uplift,
+    calculate_result_p_value,
+    calculate_result_p_value_continuous,
+    test_type,
+    uplift_mode,
+)
 
 class decision_summary:
-    def __init__(self, p1: float, p2: float, n1: int, n2: int, alpha: float = 0.05, mode: uplift_mode = uplift_mode.ABSOLUTE, test_type: test_type = test_type.TWO_SIDED):
-        self.p1 = p1
-        self.p2 = p2
+    def __init__(
+        self,
+        metric_type: Metric_type,
+        n1: int,
+        n2: int,
+        alpha: float = 0.05,
+        mode: uplift_mode = uplift_mode.ABSOLUTE,
+        test_type: test_type = test_type.TWO_SIDED,
+        p1: float | None = None,
+        p2: float | None = None,
+        mean1: float | None = None,
+        std1: float | None = None,
+        mean2: float | None = None,
+        std2: float | None = None,
+    ):
+        self.metric_type = metric_type
         self.n1 = n1
         self.n2 = n2
         self.alpha = alpha
         self.mode = mode
         self.test_type = test_type
-    
+        self.p1 = p1
+        self.p2 = p2
+        self.mean1 = mean1
+        self.std1 = std1
+        self.mean2 = mean2
+        self.std2 = std2
+
         # initialize the decision summary
         self.summary = self.generate_summary()
 
@@ -20,20 +51,19 @@ class decision_summary:
         Returns:
             dict: A dictionary containing the decision summary.
         """
-        # Calculate significance
-        is_significant = calculate_result_significance(self.p1, self.p2, self.n1, self.n2, self.alpha, self.test_type)
+        if self.metric_type == Metric_type.BINARY:
+            is_significant = calculate_result_significance(self.p1, self.p2, self.n1, self.n2, self.alpha, self.test_type)
+            p_value = calculate_result_p_value(self.p1, self.p2, self.n1, self.n2, self.test_type)
+            ci_lower, ci_upper = calculate_result_ci(self.p1, self.p2, self.n1, self.n2, self.alpha, self.test_type)
+            uplift = calculate_uplift(self.p1, self.p2, self.mode)
+        else:
+            is_significant = calculate_result_significance_continuous(self.mean1, self.mean2, self.std1, self.std2, self.n1, self.n2, self.alpha, self.test_type)
+            p_value = calculate_result_p_value_continuous(self.mean1, self.mean2, self.std1, self.std2, self.n1, self.n2, self.test_type)
+            ci_lower, ci_upper = calculate_result_ci_continuous(self.mean1, self.mean2, self.std1, self.std2, self.n1, self.n2, self.alpha, self.test_type)
+            uplift = calculate_uplift(self.mean1, self.mean2, self.mode)
 
-        # Calculate p-value
-        p_value = calculate_result_p_value(self.p1, self.p2, self.n1, self.n2, self.test_type)
-
-        # Calculate confidence interval
-        ci_lower, ci_upper = calculate_result_ci(self.p1, self.p2, self.n1, self.n2, self.alpha, self.test_type)
-
-        # Calculate uplift
-        uplift = calculate_uplift(self.p1, self.p2, self.mode)
-
-        # Calculate SRM
-        srm_p_value = calculate_srm(self.p1, self.p2, self.n1, self.n2, self.alpha)
+        # Calculate SRM (allocation-only check, independent of metric type)
+        srm_p_value = calculate_srm(self.n1, self.n2, alpha=self.alpha)
 
         # Generate decision summary
         decision_summary = {
@@ -61,7 +91,7 @@ class decision_summary:
         """
         if self.summary["srm_p_value"] < 0.05:
             return "Sample Ratio Mismatch (SRM) detected. The allocation of samples between groups may be biased. Further Investigation is needed."
-        
+
         ci_lower = self.summary["confidence_interval"]["lower"]
         ci_upper = self.summary["confidence_interval"]["upper"]
         if ci_lower <= 0 and ci_upper >= 0 or self.summary["p_value"] > self.alpha:

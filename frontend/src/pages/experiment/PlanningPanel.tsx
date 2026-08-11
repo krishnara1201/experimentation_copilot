@@ -1,11 +1,14 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { getErrorMessage } from '../../api/client';
-import { calculateMde, calculateSampleSize } from '../../api/experiments';
+import { calculateMde, calculateSampleSize, listMetrics } from '../../api/experiments';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import ErrorBanner from '../../components/ui/ErrorBanner';
 import Field from '../../components/ui/Field';
+import Select from '../../components/ui/Select';
+import Spinner from '../../components/ui/Spinner';
+import type { Metric } from '../../types/api';
 
 function ResultStat({ label, value }: { label: string; value: string }) {
   return (
@@ -16,21 +19,58 @@ function ResultStat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function MetricSelect({
+  metrics,
+  value,
+  onChange,
+}: {
+  metrics: Metric[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Select label="Metric" value={value} onChange={(event) => onChange(event.target.value)} required>
+      <option value="" disabled>
+        Select a metric…
+      </option>
+      {metrics.map((metric) => (
+        <option key={metric.id} value={metric.id}>
+          {metric.name} ({metric.type})
+        </option>
+      ))}
+    </Select>
+  );
+}
+
 export default function PlanningPanel({ experimentId }: { experimentId: number }) {
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['experiments', experimentId, 'metrics'],
+    queryFn: () => listMetrics(experimentId),
+  });
+
+  if (isLoading) return <Spinner />;
+  if (isError) return <ErrorBanner message={getErrorMessage(error, 'Failed to load metrics.')} />;
+
+  const metrics = data?.metrics ?? [];
+
   return (
     <div className="grid gap-6 sm:grid-cols-2">
-      <SampleSizeCard experimentId={experimentId} />
-      <MdeCard experimentId={experimentId} />
+      <SampleSizeCard experimentId={experimentId} metrics={metrics} />
+      <MdeCard experimentId={experimentId} metrics={metrics} />
     </div>
   );
 }
 
-function SampleSizeCard({ experimentId }: { experimentId: number }) {
+function SampleSizeCard({ experimentId, metrics }: { experimentId: number; metrics: Metric[] }) {
   const [metricId, setMetricId] = useState('');
   const [alpha, setAlpha] = useState(0.05);
   const [power, setPower] = useState(0.8);
   const [effectSize, setEffectSize] = useState(0.05);
   const [baseRate, setBaseRate] = useState(0.5);
+  const [stdDev, setStdDev] = useState(1);
+
+  const selectedMetric = metrics.find((metric) => metric.id === Number(metricId));
+  const isContinuous = selectedMetric?.type === 'continuous';
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -39,7 +79,8 @@ function SampleSizeCard({ experimentId }: { experimentId: number }) {
         alpha,
         power,
         effect_size: effectSize,
-        base_rate: baseRate,
+        base_rate: isContinuous ? undefined : baseRate,
+        std_dev: isContinuous ? stdDev : undefined,
       }),
   });
 
@@ -53,13 +94,7 @@ function SampleSizeCard({ experimentId }: { experimentId: number }) {
     <Card>
       <h3 className="mb-4 text-base font-semibold text-slate-900">Sample size calculator</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Field
-          label="Metric ID"
-          type="number"
-          value={metricId}
-          onChange={(event) => setMetricId(event.target.value)}
-          required
-        />
+        <MetricSelect metrics={metrics} value={metricId} onChange={setMetricId} />
         <div className="grid grid-cols-2 gap-4">
           <Field
             label="Alpha"
@@ -82,13 +117,23 @@ function SampleSizeCard({ experimentId }: { experimentId: number }) {
             value={effectSize}
             onChange={(event) => setEffectSize(Number(event.target.value))}
           />
-          <Field
-            label="Base rate"
-            type="number"
-            step="0.01"
-            value={baseRate}
-            onChange={(event) => setBaseRate(Number(event.target.value))}
-          />
+          {isContinuous ? (
+            <Field
+              label="Std dev (σ)"
+              type="number"
+              step="0.01"
+              value={stdDev}
+              onChange={(event) => setStdDev(Number(event.target.value))}
+            />
+          ) : (
+            <Field
+              label="Base rate"
+              type="number"
+              step="0.01"
+              value={baseRate}
+              onChange={(event) => setBaseRate(Number(event.target.value))}
+            />
+          )}
         </div>
         <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? 'Calculating…' : 'Calculate'}
@@ -102,12 +147,16 @@ function SampleSizeCard({ experimentId }: { experimentId: number }) {
   );
 }
 
-function MdeCard({ experimentId }: { experimentId: number }) {
+function MdeCard({ experimentId, metrics }: { experimentId: number; metrics: Metric[] }) {
   const [metricId, setMetricId] = useState('');
   const [alpha, setAlpha] = useState(0.05);
   const [power, setPower] = useState(0.8);
   const [sampleSize, setSampleSize] = useState(1000);
   const [baseRate, setBaseRate] = useState(0.5);
+  const [stdDev, setStdDev] = useState(1);
+
+  const selectedMetric = metrics.find((metric) => metric.id === Number(metricId));
+  const isContinuous = selectedMetric?.type === 'continuous';
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -116,7 +165,8 @@ function MdeCard({ experimentId }: { experimentId: number }) {
         alpha,
         power,
         sample_size: sampleSize,
-        base_rate: baseRate,
+        base_rate: isContinuous ? undefined : baseRate,
+        std_dev: isContinuous ? stdDev : undefined,
       }),
   });
 
@@ -130,13 +180,7 @@ function MdeCard({ experimentId }: { experimentId: number }) {
     <Card>
       <h3 className="mb-4 text-base font-semibold text-slate-900">Minimum detectable effect</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Field
-          label="Metric ID"
-          type="number"
-          value={metricId}
-          onChange={(event) => setMetricId(event.target.value)}
-          required
-        />
+        <MetricSelect metrics={metrics} value={metricId} onChange={setMetricId} />
         <div className="grid grid-cols-2 gap-4">
           <Field
             label="Alpha"
@@ -158,13 +202,23 @@ function MdeCard({ experimentId }: { experimentId: number }) {
             value={sampleSize}
             onChange={(event) => setSampleSize(Number(event.target.value))}
           />
-          <Field
-            label="Base rate"
-            type="number"
-            step="0.01"
-            value={baseRate}
-            onChange={(event) => setBaseRate(Number(event.target.value))}
-          />
+          {isContinuous ? (
+            <Field
+              label="Std dev (σ)"
+              type="number"
+              step="0.01"
+              value={stdDev}
+              onChange={(event) => setStdDev(Number(event.target.value))}
+            />
+          ) : (
+            <Field
+              label="Base rate"
+              type="number"
+              step="0.01"
+              value={baseRate}
+              onChange={(event) => setBaseRate(Number(event.target.value))}
+            />
+          )}
         </div>
         <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? 'Calculating…' : 'Calculate'}

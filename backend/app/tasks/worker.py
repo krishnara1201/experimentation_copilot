@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from app.db.session import DATABASE_URL
 from app.db.models.analysis_model import Analysis_Run, Analysis_Run_Status
+from app.db.models.metric_model import Metric_type
 from app.db.models.summary_model import Summary
 from app.stats.summary import decision_summary
 from app.stats.stat_analysis import test_type as TestTypeEnum, uplift_mode as UpliftModeEnum
@@ -60,8 +61,11 @@ async def _update_analysis_status(task_id: str, status: Analysis_Run_Status, sum
         await worker_engine.dispose()
 
 @celery_app.task(bind=True)
-def run_analysis(self, experiment_id, metric_id, variant_a_successes, variant_a_total,
-                 variant_b_successes, variant_b_total, alpha, test_type_val, uplift_mode_val):
+def run_analysis(self, experiment_id, metric_id, metric_type_val,
+                 variant_a_total, variant_b_total,
+                 variant_a_successes, variant_b_successes,
+                 variant_a_mean, variant_a_std, variant_b_mean, variant_b_std,
+                 alpha, test_type_val, uplift_mode_val):
 
     task_id = self.request.id
 
@@ -69,17 +73,33 @@ def run_analysis(self, experiment_id, metric_id, variant_a_successes, variant_a_
         # Reconstruct Enums
         actual_test_type = TestTypeEnum(test_type_val)
         actual_uplift_mode = UpliftModeEnum(uplift_mode_val)
+        actual_metric_type = Metric_type(metric_type_val)
 
         # Heavy computation
-        summary = decision_summary(
-            p1=variant_a_successes / variant_a_total,
-            n1=variant_a_total,
-            p2=variant_b_successes / variant_b_total,
-            n2=variant_b_total,
-            alpha=alpha,
-            test_type=actual_test_type,
-            mode=actual_uplift_mode
-        )
+        if actual_metric_type == Metric_type.BINARY:
+            summary = decision_summary(
+                metric_type=actual_metric_type,
+                n1=variant_a_total,
+                n2=variant_b_total,
+                p1=variant_a_successes / variant_a_total,
+                p2=variant_b_successes / variant_b_total,
+                alpha=alpha,
+                test_type=actual_test_type,
+                mode=actual_uplift_mode
+            )
+        else:
+            summary = decision_summary(
+                metric_type=actual_metric_type,
+                n1=variant_a_total,
+                n2=variant_b_total,
+                mean1=variant_a_mean,
+                std1=variant_a_std,
+                mean2=variant_b_mean,
+                std2=variant_b_std,
+                alpha=alpha,
+                test_type=actual_test_type,
+                mode=actual_uplift_mode
+            )
         text_summary = summary.generate_summary_text()
 
         # Commit success state

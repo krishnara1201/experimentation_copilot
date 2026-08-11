@@ -1,14 +1,15 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { getAnalysisRunStatus } from '../../api/analysisRuns';
 import { getErrorMessage } from '../../api/client';
-import { runAnalysis } from '../../api/experiments';
+import { listMetrics, listVariants, runAnalysis } from '../../api/experiments';
 import Badge, { type BadgeTone } from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import ErrorBanner from '../../components/ui/ErrorBanner';
 import Field from '../../components/ui/Field';
 import Select from '../../components/ui/Select';
+import Spinner from '../../components/ui/Spinner';
 import type { TestType, UpliftMode } from '../../types/api';
 
 function statusTone(status: string): BadgeTone {
@@ -20,23 +21,49 @@ function statusTone(status: string): BadgeTone {
 }
 
 export default function AnalysisPanel({ experimentId }: { experimentId: number }) {
+  const metricsQuery = useQuery({
+    queryKey: ['experiments', experimentId, 'metrics'],
+    queryFn: () => listMetrics(experimentId),
+  });
+  const variantsQuery = useQuery({
+    queryKey: ['experiments', experimentId, 'variants'],
+    queryFn: () => listVariants(experimentId),
+  });
+
   const [metricId, setMetricId] = useState('');
+  const [variantAId, setVariantAId] = useState('');
+  const [variantBId, setVariantBId] = useState('');
   const [variantASuccesses, setVariantASuccesses] = useState('');
   const [variantATotal, setVariantATotal] = useState('');
   const [variantBSuccesses, setVariantBSuccesses] = useState('');
   const [variantBTotal, setVariantBTotal] = useState('');
+  const [variantAMean, setVariantAMean] = useState('');
+  const [variantAStd, setVariantAStd] = useState('');
+  const [variantBMean, setVariantBMean] = useState('');
+  const [variantBStd, setVariantBStd] = useState('');
   const [alpha, setAlpha] = useState(0.05);
   const [upliftMode, setUpliftMode] = useState<UpliftMode>('absolute');
   const [testType, setTestType] = useState<TestType>('two-sided');
+
+  const metrics = metricsQuery.data?.metrics ?? [];
+  const variants = variantsQuery.data?.variants ?? [];
+  const selectedMetric = metrics.find((metric) => metric.id === Number(metricId));
+  const isContinuous = selectedMetric?.type === 'continuous';
+  const variantAName = variants.find((variant) => variant.id === Number(variantAId))?.name ?? 'Variant A';
+  const variantBName = variants.find((variant) => variant.id === Number(variantBId))?.name ?? 'Variant B';
 
   const runMutation = useMutation({
     mutationFn: () =>
       runAnalysis(experimentId, {
         metric_id: Number(metricId),
-        variant_a_successes: Number(variantASuccesses),
         variant_a_total: Number(variantATotal),
-        variant_b_successes: Number(variantBSuccesses),
         variant_b_total: Number(variantBTotal),
+        variant_a_successes: isContinuous ? undefined : Number(variantASuccesses),
+        variant_b_successes: isContinuous ? undefined : Number(variantBSuccesses),
+        variant_a_mean: isContinuous ? Number(variantAMean) : undefined,
+        variant_a_std: isContinuous ? Number(variantAStd) : undefined,
+        variant_b_mean: isContinuous ? Number(variantBMean) : undefined,
+        variant_b_std: isContinuous ? Number(variantBStd) : undefined,
         alpha,
         uplift_mode: upliftMode,
         test_type: testType,
@@ -52,19 +79,30 @@ export default function AnalysisPanel({ experimentId }: { experimentId: number }
     runMutation.mutate();
   };
 
+  if (metricsQuery.isLoading || variantsQuery.isLoading) return <Spinner />;
+  if (metricsQuery.isError) {
+    return <ErrorBanner message={getErrorMessage(metricsQuery.error, 'Failed to load metrics.')} />;
+  }
+  if (variantsQuery.isError) {
+    return <ErrorBanner message={getErrorMessage(variantsQuery.error, 'Failed to load variants.')} />;
+  }
+
   return (
     <div className="space-y-6">
       <Card>
         <h3 className="mb-4 text-base font-semibold text-slate-900">Run analysis</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Metric ID"
-              type="number"
-              value={metricId}
-              onChange={(event) => setMetricId(event.target.value)}
-              required
-            />
+            <Select label="Metric" value={metricId} onChange={(event) => setMetricId(event.target.value)} required>
+              <option value="" disabled>
+                Select a metric…
+              </option>
+              {metrics.map((metric) => (
+                <option key={metric.id} value={metric.id}>
+                  {metric.name} ({metric.type})
+                </option>
+              ))}
+            </Select>
             <Field
               label="Alpha"
               type="number"
@@ -74,39 +112,108 @@ export default function AnalysisPanel({ experimentId }: { experimentId: number }
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid grid-cols-2 gap-4">
-              <Field
-                label="Variant A successes"
-                type="number"
-                value={variantASuccesses}
-                onChange={(event) => setVariantASuccesses(event.target.value)}
-                required
-              />
-              <Field
-                label="Variant A total"
-                type="number"
-                value={variantATotal}
-                onChange={(event) => setVariantATotal(event.target.value)}
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Field
-                label="Variant B successes"
-                type="number"
-                value={variantBSuccesses}
-                onChange={(event) => setVariantBSuccesses(event.target.value)}
-                required
-              />
-              <Field
-                label="Variant B total"
-                type="number"
-                value={variantBTotal}
-                onChange={(event) => setVariantBTotal(event.target.value)}
-                required
-              />
-            </div>
+            <Select label="Variant A" value={variantAId} onChange={(event) => setVariantAId(event.target.value)}>
+              <option value="">(unlabeled)</option>
+              {variants.map((variant) => (
+                <option key={variant.id} value={variant.id}>
+                  {variant.name}
+                </option>
+              ))}
+            </Select>
+            <Select label="Variant B" value={variantBId} onChange={(event) => setVariantBId(event.target.value)}>
+              <option value="">(unlabeled)</option>
+              {variants.map((variant) => (
+                <option key={variant.id} value={variant.id}>
+                  {variant.name}
+                </option>
+              ))}
+            </Select>
           </div>
+          {isContinuous ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-3 gap-4">
+                <Field
+                  label={`${variantAName} mean`}
+                  type="number"
+                  value={variantAMean}
+                  onChange={(event) => setVariantAMean(event.target.value)}
+                  required
+                />
+                <Field
+                  label="Std dev"
+                  type="number"
+                  value={variantAStd}
+                  onChange={(event) => setVariantAStd(event.target.value)}
+                  required
+                />
+                <Field
+                  label="Sample size"
+                  type="number"
+                  value={variantATotal}
+                  onChange={(event) => setVariantATotal(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <Field
+                  label={`${variantBName} mean`}
+                  type="number"
+                  value={variantBMean}
+                  onChange={(event) => setVariantBMean(event.target.value)}
+                  required
+                />
+                <Field
+                  label="Std dev"
+                  type="number"
+                  value={variantBStd}
+                  onChange={(event) => setVariantBStd(event.target.value)}
+                  required
+                />
+                <Field
+                  label="Sample size"
+                  type="number"
+                  value={variantBTotal}
+                  onChange={(event) => setVariantBTotal(event.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-4">
+                <Field
+                  label={`${variantAName} successes`}
+                  type="number"
+                  value={variantASuccesses}
+                  onChange={(event) => setVariantASuccesses(event.target.value)}
+                  required
+                />
+                <Field
+                  label={`${variantAName} total`}
+                  type="number"
+                  value={variantATotal}
+                  onChange={(event) => setVariantATotal(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Field
+                  label={`${variantBName} successes`}
+                  type="number"
+                  value={variantBSuccesses}
+                  onChange={(event) => setVariantBSuccesses(event.target.value)}
+                  required
+                />
+                <Field
+                  label={`${variantBName} total`}
+                  type="number"
+                  value={variantBTotal}
+                  onChange={(event) => setVariantBTotal(event.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <Select
               label="Uplift mode"
@@ -125,7 +232,7 @@ export default function AnalysisPanel({ experimentId }: { experimentId: number }
               <option value="one-sided">One-sided</option>
             </Select>
           </div>
-          <Button type="submit" disabled={runMutation.isPending}>
+          <Button type="submit" disabled={runMutation.isPending || !metricId}>
             {runMutation.isPending ? 'Starting…' : 'Run analysis'}
           </Button>
           {runMutation.isError && (

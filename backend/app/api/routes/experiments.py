@@ -7,7 +7,12 @@ from app.db.models.metric_model import Metric, Metric_type, Metric_direction
 from app.db.models.variant_model import Variant
 from app.db.models.analysis_model import Analysis_Run, Analysis_Run_Status
 from app.db.session import get_session
-from app.stats.calculators import calculate_sample_size, calculate_minimum_detectable_effect
+from app.stats.calculators import (
+    calculate_sample_size,
+    calculate_minimum_detectable_effect,
+    calculate_sample_size_continuous,
+    calculate_minimum_detectable_effect_continuous,
+)
 from app.stats.stat_analysis import test_type, uplift_mode
 from app.tasks.worker import run_analysis
 from sqlmodel import select
@@ -300,75 +305,102 @@ async def delete_variant(experiment_id: int, variant_id: int, session: AsyncSess
 
 @router.post("/{experiment_id}/sample-size")
 async def calculate_sample_size_endpoint(experiment_id: int, metric_id: int,
-                                         alpha: float = 0.05, 
-                                         power: float = 0.8, 
+                                         alpha: float = 0.05,
+                                         power: float = 0.8,
                                          effect_size: float = 0.1,
                                          base_rate: float = 0.5,
+                                         std_dev: float | None = None,
                                          session: AsyncSession = Depends(get_session),
                                          owner: UserReceived = Depends(get_current_user)):
-    
+
     async with session:
         owner_experiment_result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == owner.id))
         owner_experiment = owner_experiment_result.scalars().first()
         if not owner_experiment:
             raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update its metrics.")
-        
+
         result = await session.execute(select(Metric).where(Metric.id == metric_id, Metric.experiment_id == experiment_id))
         metric = result.scalars().first()
-        
+
         if not metric:
             raise HTTPException(status_code=404, detail="Metric not found or you do not have permission to view it.")
-        
-        sample_size = calculate_sample_size(alpha=alpha, power=power, mde=effect_size, p1=base_rate)
-    
-    return {"sample_size": sample_size}
+
+        if metric.type == Metric_type.CONTINUOUS:
+            if std_dev is None:
+                raise HTTPException(status_code=400, detail="std_dev is required to calculate sample size for a continuous metric.")
+            sample_size = calculate_sample_size_continuous(sigma=std_dev, mde=effect_size, alpha=alpha, power=power)
+        else:
+            sample_size = calculate_sample_size(alpha=alpha, power=power, mde=effect_size, p1=base_rate)
+
+    return {"sample_size": sample_size, "metric_type": metric.type}
 
 @router.post("/{experiment_id}/mde")
 async def calculate_mde_endpoint(experiment_id: int, metric_id: int,
-                                   alpha: float = 0.05, 
-                                   power: float = 0.8, 
+                                   alpha: float = 0.05,
+                                   power: float = 0.8,
                                    sample_size: int = 1000,
                                    base_rate: float = 0.5,
+                                   std_dev: float | None = None,
                                    session: AsyncSession = Depends(get_session),
                                    owner: UserReceived = Depends(get_current_user)):
-    
+
     async with session:
         owner_experiment_result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == owner.id))
         owner_experiment = owner_experiment_result.scalars().first()
         if not owner_experiment:
             raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update its metrics.")
-        
+
         result = await session.execute(select(Metric).where(Metric.id == metric_id, Metric.experiment_id == experiment_id))
         metric = result.scalars().first()
-        
+
         if not metric:
             raise HTTPException(status_code=404, detail="Metric not found or you do not have permission to view it.")
-        
-        mde = calculate_minimum_detectable_effect(alpha=alpha, power=power, n=sample_size, p1=base_rate)
-    
-    return {"minimum_detectable_effect": mde}
+
+        if metric.type == Metric_type.CONTINUOUS:
+            if std_dev is None:
+                raise HTTPException(status_code=400, detail="std_dev is required to calculate MDE for a continuous metric.")
+            mde = calculate_minimum_detectable_effect_continuous(sigma=std_dev, n=sample_size, alpha=alpha, power=power)
+        else:
+            mde = calculate_minimum_detectable_effect(alpha=alpha, power=power, n=sample_size, p1=base_rate)
+
+    return {"minimum_detectable_effect": mde, "metric_type": metric.type}
 
 @router.post("/{experiment_id}/run-analysis")
 async def run_analysis_task(experiment_id: int, metric_id: int,
-                       variant_a_successes: int, variant_a_total: int,
-                       variant_b_successes: int, variant_b_total: int,
-                       alpha: float = 0.05, uplift_mode: uplift_mode = uplift_mode.ABSOLUTE, 
+                       variant_a_total: int, variant_b_total: int,
+                       variant_a_successes: int | None = None, variant_b_successes: int | None = None,
+                       variant_a_mean: float | None = None, variant_a_std: float | None = None,
+                       variant_b_mean: float | None = None, variant_b_std: float | None = None,
+                       alpha: float = 0.05, uplift_mode: uplift_mode = uplift_mode.ABSOLUTE,
                        test_type: test_type = test_type.TWO_SIDED,
                        session: AsyncSession = Depends(get_session),
                        owner: UserReceived = Depends(get_current_user)):
-    
+
     async with session:
         owner_experiment_result = await session.execute(select(Experiment).where(Experiment.id == experiment_id, Experiment.owner_id == owner.id))
         owner_experiment = owner_experiment_result.scalars().first()
         if not owner_experiment:
             raise HTTPException(status_code=404, detail="Experiment not found or you do not have permission to update its metrics.")
-        
+
         result = await session.execute(select(Metric).where(Metric.id == metric_id, Metric.experiment_id == experiment_id))
         metric = result.scalars().first()
-        
+
         if not metric:
             raise HTTPException(status_code=404, detail="Metric not found or you do not have permission to view it.")
-        
+
+        if metric.type == Metric_type.BINARY:
+            if variant_a_successes is None or variant_b_successes is None:
+                raise HTTPException(status_code=400, detail="variant_a_successes and variant_b_successes are required for a binary metric.")
+        else:
+            if None in (variant_a_mean, variant_a_std, variant_b_mean, variant_b_std):
+                raise HTTPException(status_code=400, detail="variant_a_mean, variant_a_std, variant_b_mean, and variant_b_std are required for a continuous metric.")
+
+        # Captured before the commit below: expire_on_commit (the default)
+        # expires every attribute on every object in the session once we
+        # commit, and re-reading metric.type afterwards would need a lazy
+        # reload that AsyncSession can't do outside an awaited call.
+        metric_type_value = metric.type.value
+
         # Create the Analysis_Run row (with a task id we control) before
         # dispatching the task, so a worker that picks it up immediately
         # always finds a matching row instead of racing this commit.
@@ -381,10 +413,15 @@ async def run_analysis_task(experiment_id: int, metric_id: int,
         run_analysis.apply_async(
             args=(experiment_id,
                   metric_id,
-                  variant_a_successes,
+                  metric_type_value,
                   variant_a_total,
-                  variant_b_successes,
                   variant_b_total,
+                  variant_a_successes,
+                  variant_b_successes,
+                  variant_a_mean,
+                  variant_a_std,
+                  variant_b_mean,
+                  variant_b_std,
                   alpha,
                   test_type.value,
                   uplift_mode.value),
