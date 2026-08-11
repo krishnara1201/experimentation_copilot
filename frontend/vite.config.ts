@@ -6,4 +6,16 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.ts',
+    css: true,
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
+    coverage: {
+      reporter: ['text', 'lcov'],
+      exclude: ['src/main.tsx', 'src/vite-env.d.ts'],
+    },
+  },
 });
