@@ -39,9 +39,9 @@ export default function OverviewPanel({ experiment }: { experiment: Experiment }
   };
 
   const fields: Array<[string, string]> = [
-    ['Description', experiment.description ?? '—'],
-    ['Hypothesis', experiment.hypothesis ?? '—'],
-    ['Unit of randomization', experiment.unit_of_randomization ?? '—'],
+    ['Description', experiment.description || '—'],
+    ['Hypothesis', experiment.hypothesis || '—'],
+    ['Unit of randomization', experiment.unit_of_randomization || '—'],
     ['Start date', experiment.start_date ?? '—'],
     ['End date', experiment.end_date ?? '—'],
     ['Created', formatDate(experiment.created_at)],

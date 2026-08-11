@@ -22,8 +22,8 @@ export interface UpdateExperimentInput {
   description?: string;
   hypothesis?: string;
   unit_of_randomization?: string;
-  start_date?: string;
-  end_date?: string;
+  start_date?: string | null;
+  end_date?: string | null;
   status?: ExperimentStatus;
 }
 

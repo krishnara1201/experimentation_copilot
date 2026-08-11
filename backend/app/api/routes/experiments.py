@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from app.db.models.experiment_model import Experiment, ExperimentUpdate
 from app.db.models.metric_model import Metric, Metric_type, Metric_direction
 from app.db.models.variant_model import Variant
@@ -66,7 +67,11 @@ async def update_experiment(experiment_id: int, experiment_details: ExperimentUp
         for field, value in updates.items():
             setattr(existing_experiment, field, value)
 
-        await session.commit()
+        try:
+            await session.commit()
+        except IntegrityError:
+            await session.rollback()
+            raise HTTPException(status_code=409, detail="An experiment with that name already exists.")
         await session.refresh(existing_experiment)
     return {"message": f"Experiment {experiment_id} updated", "experiment": existing_experiment}
 

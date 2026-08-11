@@ -38,11 +38,14 @@ export default function EditExperimentModal({
         description,
         hypothesis,
         unit_of_randomization: unitOfRandomization,
-        // Omit rather than send "" — the backend's date field rejects an empty
-        // string, and omitting leaves the existing value (or absence of one)
-        // untouched via the partial-update handler's exclude_unset behavior.
-        start_date: startDate || undefined,
-        end_date: endDate || undefined,
+        // An empty date input means the user wants to clear the field, so we
+        // send an explicit `null` rather than omitting the key. Omitting the
+        // key entirely would mean "unchanged" under the backend's
+        // exclude_unset handling, leaving the old value untouched instead of
+        // clearing it — sending `null` makes the clear an explicit, applied
+        // update.
+        start_date: startDate || null,
+        end_date: endDate || null,
         status,
       }),
     onSuccess: () => {
