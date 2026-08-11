@@ -384,7 +384,7 @@ node.exe "$TSC_WIN" --noEmit -p "$PROJ_WIN"
 Expected: no output, exit code 0. (Ran for real: passed.)
 
 - [x] **Step 2: Real production build** via `docker compose up --build` — this is the only reliable way to run a real Linux `npm run build` (Windows `node.exe` can't run Vite's native rolldown bindings at all). Build succeeded: `tsc --noEmit && vite build` completed cleanly, `dist/` produced.
-- [x] **Step 3: No browser-driving tool available in this session** (no `chromium-cli`, no project `run` skill) — could not click through the dropdowns and screenshot them. Substituted the real-infra HTTP verification in Task 7 Step 3 (full `/run-analysis` round trip through the real stack for both metric types) as the strongest available substitute, but this does **not** confirm the dropdown UI itself renders/behaves correctly in a browser. Recommend a manual click-through (or setting up `chromium-cli` / a project `run` skill) before considering this feature fully done from a UI perspective.
+- [x] **Step 3: Manual UI click-through.** No browser-driving tool was available in this session (no `chromium-cli`, no project `run` skill), so the agent couldn't click through the dropdowns and screenshot them itself — it substituted the real-infra HTTP verification in Task 7 Step 3 (full `/run-analysis` round trip through the real stack for both metric types) as the strongest available automated substitute. The user then brought the `docker compose` stack up and manually clicked through the Planning and Analysis tabs at `localhost:3000` and confirmed the dropdowns and type-aware fields work as expected. Feature is confirmed done from a UI perspective too.
 
 ---
 
