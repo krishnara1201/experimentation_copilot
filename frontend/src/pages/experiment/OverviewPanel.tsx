@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getErrorMessage } from '../../api/client';
 import { deleteExperiment } from '../../api/experiments';
+import EditExperimentModal from '../../components/EditExperimentModal';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -20,6 +21,7 @@ export default function OverviewPanel({ experiment }: { experiment: Experiment }
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteExperiment(experiment.id),
@@ -64,7 +66,10 @@ export default function OverviewPanel({ experiment }: { experiment: Experiment }
           <ErrorBanner message={error} />
         </div>
       )}
-      <div className="mt-6 border-t border-slate-100 pt-6">
+      <div className="mt-6 flex gap-2 border-t border-slate-100 pt-6">
+        <Button variant="secondary" icon={<Pencil className="h-4 w-4" />} onClick={() => setIsEditing(true)}>
+          Edit
+        </Button>
         <Button
           variant="danger"
           icon={<Trash2 className="h-4 w-4" />}
@@ -74,6 +79,7 @@ export default function OverviewPanel({ experiment }: { experiment: Experiment }
           {deleteMutation.isPending ? 'Deleting…' : 'Delete experiment'}
         </Button>
       </div>
+      {isEditing && <EditExperimentModal experiment={experiment} onClose={() => setIsEditing(false)} />}
     </Card>
   );
 }
