@@ -7,8 +7,8 @@ import { getToken, setToken as persistToken } from '../api/tokenStore';
 interface AuthContextValue {
   isAuthenticated: boolean;
   username: string | null;
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
+  register: (username: string, email: string, fullName: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -25,14 +25,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setUnauthorizedHandler(null);
   }, []);
 
-  const login = async (username: string, password: string) => {
-    const response = await loginRequest(username, password);
+  const login = async (identifier: string, password: string) => {
+    const response = await loginRequest(identifier, password);
     persistToken(response.access_token);
     setTokenState(response.access_token);
   };
 
-  const register = async (username: string, email: string, password: string) => {
-    await registerUser({ username, email, password });
+  const register = async (username: string, email: string, fullName: string, password: string) => {
+    await registerUser({ username, email, full_name: fullName, password });
     await login(username, password);
   };
 
