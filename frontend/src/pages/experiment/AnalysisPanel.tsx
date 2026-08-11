@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
-import { getAnalysisRunStatus } from '../../api/analysisRuns';
+import { getAnalysisResult, getAnalysisRunStatus, getAnalysisSummary } from '../../api/analysisRuns';
 import { getErrorMessage } from '../../api/client';
 import { listMetrics, listVariants, runAnalysis } from '../../api/experiments';
 import Badge, { type BadgeTone } from '../../components/ui/Badge';
@@ -72,6 +72,19 @@ export default function AnalysisPanel({ experimentId }: { experimentId: number }
 
   const statusMutation = useMutation({
     mutationFn: (analysisRunId: number) => getAnalysisRunStatus(analysisRunId),
+  });
+
+  const isCompleted = statusMutation.data?.status.toLowerCase() === 'completed';
+
+  const summaryQuery = useQuery({
+    queryKey: ['experiments', experimentId, 'analysis-summary', statusMutation.data?.id],
+    queryFn: () => getAnalysisSummary(experimentId),
+    enabled: isCompleted,
+  });
+  const resultQuery = useQuery({
+    queryKey: ['experiments', experimentId, 'analysis-result', statusMutation.data?.id],
+    queryFn: () => getAnalysisResult(experimentId),
+    enabled: isCompleted,
   });
 
   const handleSubmit = (event: FormEvent) => {
@@ -282,6 +295,55 @@ export default function AnalysisPanel({ experimentId }: { experimentId: number }
               )}
             </dl>
           )}
+        </Card>
+      )}
+
+      {isCompleted && (
+        <Card>
+          <h3 className="mb-4 text-base font-semibold text-slate-900">Results</h3>
+          {(summaryQuery.isLoading || resultQuery.isLoading) && <Spinner />}
+          {summaryQuery.isError && (
+            <ErrorBanner message={getErrorMessage(summaryQuery.error, 'Failed to load analysis summary.')} />
+          )}
+          {resultQuery.isError && (
+            <div className="mt-4">
+              <ErrorBanner message={getErrorMessage(resultQuery.error, 'Failed to load analysis result.')} />
+            </div>
+          )}
+          {summaryQuery.isSuccess && (
+            <dl className="grid grid-cols-2 gap-4 rounded-lg bg-slate-50 p-4 sm:grid-cols-3">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Significant</dt>
+                <dd className="mt-1">
+                  <Badge tone={summaryQuery.data.is_significant ? 'green' : 'slate'}>
+                    {summaryQuery.data.is_significant ? 'Yes' : 'No'}
+                  </Badge>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">P-value</dt>
+                <dd className="mt-1 text-sm font-medium text-slate-900">{summaryQuery.data.p_value.toFixed(4)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Uplift</dt>
+                <dd className="mt-1 text-sm font-medium text-slate-900">{summaryQuery.data.uplift.toFixed(4)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Confidence interval</dt>
+                <dd className="mt-1 text-sm font-medium text-slate-900">
+                  [{summaryQuery.data.confidence_interval.lower.toFixed(4)},{' '}
+                  {summaryQuery.data.confidence_interval.upper.toFixed(4)}]
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">SRM p-value</dt>
+                <dd className="mt-1 text-sm font-medium text-slate-900">
+                  {summaryQuery.data.srm_p_value.toFixed(4)}
+                </dd>
+              </div>
+            </dl>
+          )}
+          {resultQuery.isSuccess && <p className="mt-4 text-sm text-slate-700">{resultQuery.data}</p>}
         </Card>
       )}
     </div>
