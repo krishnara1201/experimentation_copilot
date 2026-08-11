@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { Experiment, Metric, MetricDirection, MetricType, TestType, UpliftMode, Variant } from '../types/api';
+import type { Experiment, ExperimentStatus, Metric, MetricDirection, MetricType, TestType, UpliftMode, Variant } from '../types/api';
 
 export function listExperiments(): Promise<{ experiments: Experiment[] }> {
   return apiRequest('/api/experiments/');
@@ -15,6 +15,23 @@ export function createExperiment(name: string, description: string): Promise<{ m
 
 export function deleteExperiment(id: number): Promise<{ message: string }> {
   return apiRequest(`/api/experiments/${id}`, { method: 'DELETE' });
+}
+
+export interface UpdateExperimentInput {
+  name?: string;
+  description?: string;
+  hypothesis?: string;
+  unit_of_randomization?: string;
+  start_date?: string;
+  end_date?: string;
+  status?: ExperimentStatus;
+}
+
+export function updateExperiment(
+  id: number,
+  input: UpdateExperimentInput
+): Promise<{ message: string; experiment: Experiment }> {
+  return apiRequest(`/api/experiments/${id}`, { method: 'PATCH', body: input });
 }
 
 export function listMetrics(experimentId: number): Promise<{ metrics: Metric[] }> {
