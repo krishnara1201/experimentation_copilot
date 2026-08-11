@@ -3,6 +3,9 @@ import { useState, type FormEvent } from 'react';
 import { getAnalysisResult, getAnalysisRunStatus, getAnalysisSummary } from '../../api/analysisRuns';
 import { getErrorMessage } from '../../api/client';
 import { listMetrics, listVariants, runAnalysis } from '../../api/experiments';
+import ConfidenceIntervalChart from '../../components/charts/ConfidenceIntervalChart';
+import NormalDistributionChart from '../../components/charts/NormalDistributionChart';
+import SuccessRateBarChart from '../../components/charts/SuccessRateBarChart';
 import Badge, { type BadgeTone } from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -342,6 +345,34 @@ export default function AnalysisPanel({ experimentId }: { experimentId: number }
                 </dd>
               </div>
             </dl>
+          )}
+          {summaryQuery.isSuccess && (
+            <ConfidenceIntervalChart
+              estimate={summaryQuery.data.uplift}
+              lower={summaryQuery.data.confidence_interval.lower}
+              upper={summaryQuery.data.confidence_interval.upper}
+              isSignificant={summaryQuery.data.is_significant}
+            />
+          )}
+          {isContinuous ? (
+            Number.isFinite(Number(variantAMean)) &&
+            Number.isFinite(Number(variantAStd)) &&
+            Number.isFinite(Number(variantBMean)) &&
+            Number.isFinite(Number(variantBStd)) && (
+              <NormalDistributionChart
+                curves={[
+                  { label: variantAName, mean: Number(variantAMean), stdDev: Number(variantAStd), color: '#4f46e5' },
+                  { label: variantBName, mean: Number(variantBMean), stdDev: Number(variantBStd), color: '#f97316' },
+                ]}
+              />
+            )
+          ) : (
+            <SuccessRateBarChart
+              bars={[
+                { label: variantAName, successes: Number(variantASuccesses), total: Number(variantATotal) },
+                { label: variantBName, successes: Number(variantBSuccesses), total: Number(variantBTotal) },
+              ]}
+            />
           )}
           {resultQuery.isSuccess && <p className="mt-4 text-sm text-slate-700">{resultQuery.data}</p>}
         </Card>

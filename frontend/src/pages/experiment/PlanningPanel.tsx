@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { getErrorMessage } from '../../api/client';
 import { calculateMde, calculateSampleSize, listMetrics } from '../../api/experiments';
+import NormalDistributionChart from '../../components/charts/NormalDistributionChart';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import ErrorBanner from '../../components/ui/ErrorBanner';
@@ -9,6 +10,25 @@ import Field from '../../components/ui/Field';
 import Select from '../../components/ui/Select';
 import Spinner from '../../components/ui/Spinner';
 import type { Metric } from '../../types/api';
+
+const BASELINE_COLOR = '#4f46e5';
+const SHIFTED_COLOR = '#f97316';
+
+function effectCurves(isContinuous: boolean, baseRate: number, stdDev: number, effect: number) {
+  if (isContinuous) {
+    return [
+      { label: 'Baseline', mean: 0, stdDev, color: BASELINE_COLOR },
+      { label: 'Baseline + effect', mean: effect, stdDev, color: SHIFTED_COLOR },
+    ];
+  }
+  const shiftedRate = baseRate + effect;
+  const baselineStdDev = Math.sqrt(Math.max(baseRate * (1 - baseRate), 0.0001));
+  const shiftedStdDev = Math.sqrt(Math.max(shiftedRate * (1 - shiftedRate), 0.0001));
+  return [
+    { label: 'Baseline rate', mean: baseRate, stdDev: baselineStdDev, color: BASELINE_COLOR },
+    { label: 'Baseline + effect', mean: shiftedRate, stdDev: shiftedStdDev, color: SHIFTED_COLOR },
+  ];
+}
 
 function ResultStat({ label, value }: { label: string; value: string }) {
   return (
@@ -140,7 +160,10 @@ function SampleSizeCard({ experimentId, metrics }: { experimentId: number; metri
         </Button>
         {mutation.isError && <ErrorBanner message={getErrorMessage(mutation.error, 'Calculation failed.')} />}
         {mutation.isSuccess && (
-          <ResultStat label="Required sample size per variant" value={String(mutation.data.sample_size)} />
+          <>
+            <ResultStat label="Required sample size per variant" value={String(mutation.data.sample_size)} />
+            <NormalDistributionChart curves={effectCurves(isContinuous, baseRate, stdDev, effectSize)} />
+          </>
         )}
       </form>
     </Card>
@@ -225,10 +248,15 @@ function MdeCard({ experimentId, metrics }: { experimentId: number; metrics: Met
         </Button>
         {mutation.isError && <ErrorBanner message={getErrorMessage(mutation.error, 'Calculation failed.')} />}
         {mutation.isSuccess && (
-          <ResultStat
-            label="Minimum detectable effect"
-            value={mutation.data.minimum_detectable_effect.toFixed(4)}
-          />
+          <>
+            <ResultStat
+              label="Minimum detectable effect"
+              value={mutation.data.minimum_detectable_effect.toFixed(4)}
+            />
+            <NormalDistributionChart
+              curves={effectCurves(isContinuous, baseRate, stdDev, mutation.data.minimum_detectable_effect)}
+            />
+          </>
         )}
       </form>
     </Card>
