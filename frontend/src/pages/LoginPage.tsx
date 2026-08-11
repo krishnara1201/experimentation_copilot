@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext';
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +20,7 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await login(username, password);
+      await login(identifier, password);
       navigate('/experiments');
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to log in.'));
@@ -33,9 +33,9 @@ export default function LoginPage() {
     <AuthLayout title="Welcome back" subtitle="Log in to continue to your experiments.">
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field
-          label="Username"
-          value={username}
-          onChange={(event) => setUsername(event.target.value)}
+          label="Username or email"
+          value={identifier}
+          onChange={(event) => setIdentifier(event.target.value)}
           required
           autoFocus
         />
