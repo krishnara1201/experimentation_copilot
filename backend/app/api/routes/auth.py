@@ -35,8 +35,9 @@ async def create_user(
         
         # Fixed keyword argument mapping here
         user = User(
-            username=payload.username, 
-            email=payload.email, 
+            username=payload.username,
+            email=payload.email,
+            full_name=payload.full_name,
             hashed_password=hashed_password
         )
     except ValueError as e:
@@ -63,8 +64,10 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
 
-async def authenticate_user(username: str, password: str, session: AsyncSession = Depends(get_session)):
-    result = await session.execute(select(User).where(User.username == username))
+async def authenticate_user(identifier: str, password: str, session: AsyncSession = Depends(get_session)):
+    result = await session.execute(
+        select(User).where((User.username == identifier) | (User.email == identifier))
+    )
     user = result.scalars().first()
     if not user:
         return False

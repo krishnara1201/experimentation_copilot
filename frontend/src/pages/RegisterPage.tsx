@@ -12,16 +12,24 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await register(username, email, password);
+      await register(username, email, fullName, password);
       navigate('/experiments');
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to register.'));
@@ -34,11 +42,17 @@ export default function RegisterPage() {
     <AuthLayout title="Create your account" subtitle="Start planning statistically sound experiments.">
       <form onSubmit={handleSubmit} className="space-y-4">
         <Field
+          label="Full name"
+          value={fullName}
+          onChange={(event) => setFullName(event.target.value)}
+          required
+          autoFocus
+        />
+        <Field
           label="Username"
           value={username}
           onChange={(event) => setUsername(event.target.value)}
           required
-          autoFocus
         />
         <Field
           label="Email"
@@ -52,6 +66,13 @@ export default function RegisterPage() {
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
+          required
+        />
+        <Field
+          label="Confirm password"
+          type="password"
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
           required
         />
         {error && <ErrorBanner message={error} />}
